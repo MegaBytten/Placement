@@ -5,6 +5,8 @@ p_load('rio')
 my_data <- import("~/Downloads/MODY Interview Task.xlsx")
 View(my_data)
 
+#add new variable column that values each group instead of splitting into groups
+#usually visualise data to find outliers before working it (clean data)
 
 #Splitting data group into 2, insulin treatment before/after 6 months
 before_data = my_data[my_data$TTI == '<6m',]
