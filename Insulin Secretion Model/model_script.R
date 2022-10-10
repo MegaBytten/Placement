@@ -3,6 +3,7 @@
 ################################################################################
 ### - age_atdiag is the exact patient age in double form
 ### - AgeatDiagnosis is the patient age in int form (used)
+### - In equations where AGE is used, AgeatDiag was used instead - need to fix!
 ################################################################################
 ################################################################################
 install.packages('pacman')
@@ -12,6 +13,7 @@ p_load('rio')
 filepath = '~/Downloads/Insulin secretion model/startight Aug 22 comma separated.csv'
 my_data <- import(filepath)
 View(my_data)
+
 
 ################################################################################
 ########### Section for Cleaning and preparing Data: ###########################
@@ -46,7 +48,6 @@ my_data$ZNT8_Status[grepl("[0-9]",my_data$ZNT8) & as.numeric(my_data$ZNT8) >= 65
 ################################################################################
 ################################################################################
 
-
 #Creating a new dataframe filtered by AgeatDiagnosis and Height/weight or BMI
 data_with_heightweight = my_data[!is.na(my_data$Height) & !is.na(my_data$Weight),] #Includes by height/weight values
 data_with_BMI = my_data[!is.na(my_data$BMI),] #includes by BMI values
@@ -57,11 +58,10 @@ model_data = model_data[!is.na(model_data$AgeatDiagnosis),] #Filters by removing
 model_data$BMI[is.na(model_data$BMI)] = model_data$Weight[is.na(model_data$BMI)] / (model_data$Height[is.na(model_data$BMI)]^2) 
 
 #Add new column containing model prediction score
-model_data$Model1Prediction = 37.94 + (-5.09 * log(model_data$AgeatDiagnosis)) + (-6.34 * log(model_data$BMI))
+model_data$Model1LogOR = 37.94 + (-5.09 * log(model_data$AgeatDiagnosis)) + (-6.34 * log(model_data$BMI))
 
 #Visualise the data below
-plot(model_data$Model1Prediction, model_data$BMI)
-
+plot(model_data$Model1LogOR, model_data$BMI)
 
 
 ################################################################################
@@ -74,13 +74,12 @@ plot(model_data$Model1Prediction, model_data$BMI)
 ################################################################################
 ################################################################################
 
-
 #Exclude anyone without GAD data
-model_data = model_data[!is.na(model_data$GADA_Status),] 
+model_data$Model2LogOR[is.na(model_data$GADA_Status)] = NA
 
 #Add new column containing model prediction score
-model_data$Model2Prediction = 34.8057844720 + (-4.801441792 * log (model_data$AgeatDiagnosis)) + (-5.980577792 * log(model_data$BMI)) + (2.937107976 * model_data$GADA_Status)
-
+model_data$Model2LogOR[!is.na(model_data$GADA_Status)] = 34.8057844720 + (-4.801441792 * log (model_data$AgeatDiagnosis[!is.na(model_data$GADA_Status)])) + (-5.980577792 * log(model_data$BMI[!is.na(model_data$GADA_Status)])) + (2.937107976 * model_data$GADA_Status[!is.na(model_data$GADA_Status)])
+(model_data$Model2LogOR)
 
 
 ################################################################################
@@ -93,31 +92,55 @@ model_data$Model2Prediction = 34.8057844720 + (-4.801441792 * log (model_data$Ag
 ################################################################################
 ################################################################################
 
-CANT REASSIGN HERE! Reassigning loses model2 and model 1 data!!!
-#Reassign model_data as some people without GAD but with ZNT8 may have been excluded
-model_data = rbind.data.frame(data_with_heightweight, data_with_BMI)
-model_data = model_data[!is.na(model_data$AgeatDiagnosis),] #Filters by removing anyone without ageatdiag
-
 #Exclude anyone without ZNT8 data
-model_data = model_data[!is.na(model_data$ZNT8_Status),]
+model_data$Model3LogOR[is.na(model_data$ZNT8_Status)] = NA
 
 #Add new column containing model prediction score
-model_data$Model3Prediction = 37.26905033 + (3.194096 * model_data$ZNT8_Status ) + (-5.047657308 * log(model_data$AgeatDiagnosis)) + (-6.287258808 * log(model_data$BMI))
-#Potential error here! Not sure if AgeatDiagnosis or current Age!!
-
-
-#data_with_ZNT8 = my_data[!is.na(my_data$ZNT8),]
+model_data$Model3LogOR[!is.na(model_data$ZNT8_Status)] = 37.26905033 + (3.194096 * model_data$ZNT8_Status[!is.na(model_data$ZNT8_Status)]) + (-5.047657308 * log(model_data$AgeatDiagnosis[!is.na(model_data$ZNT8_Status)])) + (-6.287258808 * log(model_data$BMI[!is.na(model_data$ZNT8_Status)]))
+(model_data$Model3LogOR)
 
 
 ################################################################################
-################################ Utility #######################################
+#################### Section for testing Model 4: ##############################
 ################################################################################
-(model_data$Model3Prediction)
-(model_data$Model2)
+### - Clinical features + GAD + ZNT8 model
+### - Takes in AgeatDiag, BMI, GAD and ZNT8
+### - Selection and model based around following equation, where ‡ AntiStatus1 = GADA positive only, AntiStatus2 = Znt8 positive only, AntiStatus3 = Both GADA and Znt8 positive. Please code all of these as 0=no and 1=yes
+### = 33.49649577 + (-4.665598345 * Log(Age)) + (-5.81137397 * Log(BMI)) + (3.082366 * AntiStatus1‡) + (3.494462 * AntiStatus2‡) + (4.350717 * AntiStatus3‡)
+################################################################################
+################################################################################
+
+#Exclude anyone without ZNT8 data OR without GADA data
+model_data$Model4LogOR[is.na(model_data$ZNT8_Status) | is.na(model_data$GADA_Status)] = NA
+
+#Create new column to see if patient is positive for both antibodies
+model_data$Both_Status[is.na(model_data$ZNT8_Status) | is.na(model_data$GADA_Status)] = NA
+model_data$Both_Status[!is.na(model_data$ZNT8_Status) & !is.na(model_data$GADA_Status)] = 0
+model_data$Both_Status[model_data$ZNT8_Status == 1 & model_data$GADA_Status == 1] = 1
+
+#Add new column containing model prediction score
+model_data$Model4LogOR[!is.na(model_data$Both_Status)] = 33.49649577 + (-4.665598345 * log(model_data$AgeatDiagnosis[!is.na(model_data$Both_Status)])) + (-5.81137397 * log(model_data$BMI[!is.na(model_data$Both_Status)])) + (3.082366 * model_data$GADA_Status[!is.na(model_data$Both_Status)]) + (3.494462 * model_data$ZNT8_Status[!is.na(model_data$Both_Status)]) + (4.350717 * model_data$Both_Status[!is.na(model_data$Both_Status)])
 
 
+################################################################################
+############## Converting LogOR into Probability (risk) ########################
+### - uses following equation
+### = exp(LogOR) / (1 + exp(LogOR)
+################################################################################
+model_data$Model1Prob[!is.na(model_data$Model1LogOR)] = exp(model_data$Model1LogOR[!is.na(model_data$Model1LogOR)]) / (1 + exp(model_data$Model1LogOR[!is.na(model_data$Model1LogOR)]) )
+model_data$Model2Prob[!is.na(model_data$Model2LogOR)] = exp(model_data$Model2LogOR[!is.na(model_data$Model2LogOR)]) / (1 + exp(model_data$Model2LogOR[!is.na(model_data$Model2LogOR)]) )
+model_data$Model3Prob[!is.na(model_data$Model3LogOR)] = exp(model_data$Model3LogOR[!is.na(model_data$Model3LogOR)]) / (1 + exp(model_data$Model3LogOR[!is.na(model_data$Model3LogOR)]) )
+model_data$Model4Prob[!is.na(model_data$Model4LogOR)] = exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) / (1 + exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) )
 
 
+################################################################################
+########################### Visualise Results ##################################
+################################################################################
+dev.off(dev.list()["RStudioGD"]) #Clears any previous dev plotting settings
+par(mfrow = c(4,1)) #Allows us to visualise 4 plots at once
 
-
+hist(model_data$Model1Prob)
+hist(model_data$Model2Prob)
+hist(model_data$Model3Prob)
+hist(model_data$Model4Prob)
 

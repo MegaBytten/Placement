@@ -18,6 +18,8 @@ summary(my_data)
 
 
 #Filters the data down to only white british and white irish patients under the age of 35
+ethnicities_list = list('White British', 'White Irish')
+model_data$BMI[model_data$EthnicOrigin %in%{ethnicities_list}] = model_data$Weight[model_data$EthnicOrigin %in%{ethnicities_list}] / model_data$Height[model_data$EthnicOrigin %in%{ethnicities_list}]^2
 filtered_group_white_european = my_data [my_data$EthnicOrigin == 'White British' & my_data$AgeatDiagnosis <= 35 | my_data$EthnicOrigin == 'White Irish' & my_data$AgeatDiagnosis <= 35,]
 # View(filtered_group_white_european)
 
