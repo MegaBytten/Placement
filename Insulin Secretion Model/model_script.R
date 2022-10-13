@@ -6,8 +6,8 @@
 ### - In equations where AGE is used, AgeatDiag was used instead - need to fix!
 ################################################################################
 ################################################################################
-install.packages('pacman')
-require('pacman')
+library(pacman)
+library(tidyverse)
 p_load('rio')
 
 filepath = '~/Downloads/Insulin secretion model/startight Aug 22 comma separated.csv'
@@ -37,6 +37,10 @@ my_data$ZNT8_Status = NA
 my_data$ZNT8_Status[my_data$ZNT8 == 'negative'] = 0
 my_data$ZNT8_Status[grepl("[0-9]",my_data$ZNT8) & as.numeric(my_data$ZNT8) >= 65] = 1
 
+#New column IA2_Status will default to NA, and if negative = 0, positive = 1
+my_data$IA2A_Status = NA
+my_data$IA2A_Status[my_data$IA2 == 'negative'] = 0
+my_data$IA2A_Status[grepl("[0-9]",my_data$IA2) & as.numeric(my_data$IA2) >= 7.5] = 1
 
 ################################################################################
 #################### Section for testing Model 1: ##############################
@@ -86,40 +90,40 @@ model_data$Model2LogOR[!is.na(model_data$GADA_Status)] = 34.8057844720 + (-4.801
 ################################################################################
 #################### Section for testing Model 3: ##############################
 ################################################################################
-### - Clinical features + ZNT8 model
-### - Takes in AgeatDiag, BMI and ZNT8
-### - Selection and model based around following equation, where ZNT8 = 0 if negative, 1 if positive
-### = 37.26905033 + (3.194096 * Znt8† ) + (-5.047657308 * Log(Age)) + (-6.287258808 * Log(BMI))
+### - Clinical features + IA2 model
+### - Takes in AgeatDiag, BMI and IA2
+### - Selection and model based around following equation, where IA2 = 0 if negative, 1 if positive
+### = 37.26905033 + (3.194096 * IA2† ) + (-5.047657308 * Log(Age)) + (-6.287258808 * Log(BMI))
 ################################################################################
 ################################################################################
 
-#Exclude anyone without ZNT8 data
-model_data$Model3LogOR[is.na(model_data$ZNT8_Status)] = NA
+#Exclude anyone without IA2 data
+model_data$Model3LogOR[is.na(model_data$IA2A_Status)] = NA
 
 #Add new column containing model prediction score
-model_data$Model3LogOR[!is.na(model_data$ZNT8_Status)] = 37.26905033 + (3.194096 * model_data$ZNT8_Status[!is.na(model_data$ZNT8_Status)]) + (-5.047657308 * log(model_data$AgeatDiagnosis[!is.na(model_data$ZNT8_Status)])) + (-6.287258808 * log(model_data$BMI[!is.na(model_data$ZNT8_Status)]))
+model_data$Model3LogOR[!is.na(model_data$IA2A_Status)] = 37.26905033 + (3.194096 * model_data$IA2A_Status[!is.na(model_data$IA2A_Status)]) + (-5.047657308 * log(model_data$AgeatDiagnosis[!is.na(model_data$IA2A_Status)])) + (-6.287258808 * log(model_data$BMI[!is.na(model_data$IA2A_Status)]))
 
 
 ################################################################################
 #################### Section for testing Model 4: ##############################
 ################################################################################
 ### - Clinical features + GAD + ZNT8 model
-### - Takes in AgeatDiag, BMI, GAD and ZNT8
+### - Takes in AgeatDiag, BMI, GAD and IA2
 ### - Selection and model based around following equation, where ‡ AntiStatus1 = GADA positive only, AntiStatus2 = Znt8 positive only, AntiStatus3 = Both GADA and Znt8 positive. Please code all of these as 0=no and 1=yes
 ### = 33.49649577 + (-4.665598345 * Log(Age)) + (-5.81137397 * Log(BMI)) + (3.082366 * AntiStatus1‡) + (3.494462 * AntiStatus2‡) + (4.350717 * AntiStatus3‡)
 ################################################################################
 ################################################################################
 
 #Exclude anyone without ZNT8 data OR without GADA data
-model_data$Model4LogOR[is.na(model_data$ZNT8_Status) | is.na(model_data$GADA_Status)] = NA
+model_data$Model4LogOR[is.na(model_data$IA2A_Status) | is.na(model_data$GADA_Status)] = NA
 
 #Create new column to see if patient is positive for both antibodies
-model_data$Both_Status[is.na(model_data$ZNT8_Status) | is.na(model_data$GADA_Status)] = NA
-model_data$Both_Status[!is.na(model_data$ZNT8_Status) & !is.na(model_data$GADA_Status)] = 0
-model_data$Both_Status[model_data$ZNT8_Status == 1 & model_data$GADA_Status == 1] = 1
+model_data$Both_Status[is.na(model_data$IA2A_Status) | is.na(model_data$GADA_Status)] = NA
+model_data$Both_Status[!is.na(model_data$IA2A_Status) & !is.na(model_data$GADA_Status)] = 0
+model_data$Both_Status[model_data$IA2A_Status == 1 & model_data$GADA_Status == 1] = 1
 
 #Add new column containing model prediction score
-model_data$Model4LogOR[!is.na(model_data$Both_Status)] = 33.49649577 + (-4.665598345 * log(model_data$AgeatDiagnosis[!is.na(model_data$Both_Status)])) + (-5.81137397 * log(model_data$BMI[!is.na(model_data$Both_Status)])) + (3.082366 * model_data$GADA_Status[!is.na(model_data$Both_Status)]) + (3.494462 * model_data$ZNT8_Status[!is.na(model_data$Both_Status)]) + (4.350717 * model_data$Both_Status[!is.na(model_data$Both_Status)])
+model_data$Model4LogOR[!is.na(model_data$Both_Status)] = 33.49649577 + (-4.665598345 * log(model_data$AgeatDiagnosis[!is.na(model_data$Both_Status)])) + (-5.81137397 * log(model_data$BMI[!is.na(model_data$Both_Status)])) + (3.082366 * model_data$GADA_Status[!is.na(model_data$Both_Status)]) + (3.494462 * model_data$IA2A_Status[!is.na(model_data$Both_Status)]) + (4.350717 * model_data$Both_Status[!is.na(model_data$Both_Status)])
 
 
 ################################################################################
@@ -145,26 +149,74 @@ write.csv(model_data$Model4Prob[!is.na(model_data$Model4Prob)], '~/Downloads/aut
 
 
 ################################################################################
-################## Descriptive Statistics on groups ############################
-################################################################################
-### - Finding % in each decile
+######## Filtering, cleaning and visualising Results ###########################
 ################################################################################
 
-p_load(psych)
-describe(model_data$Model1Prob[!is.na(model_data$Model2Prob)])
+#Find people who were diagnosed type 2 now going on insulin within 2 years
 
+#Find people with continuous_insulin data that began insulin after 6 months of diagnosis
+model_data$Time_to_insulin = difftime(as.Date(model_data$Date_continuous_insulin, "%d-%B-%Y"),
+                                      as.Date(model_data$Date_Visit, "%d-%B-%Y"),
+                                      units = 'days')
 
-(nrow(model_data[model_data$Model1Prob <= 0.1,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.1 & model_data$Model1Prob <= 0.2,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.2 & model_data$Model1Prob <= 0.3,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.3 & model_data$Model1Prob <= 0.4,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.4 & model_data$Model1Prob <= 0.5,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.5 & model_data$Model1Prob <= 0.6,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.6 & model_data$Model1Prob <= 0.7,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.7 & model_data$Model1Prob <= 0.8,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.8 & model_data$Model1Prob <= 0.9,])/nrow(model_data))
-(nrow(model_data[model_data$Model1Prob > 0.9 & model_data$Model1Prob <= 1.0,])/nrow(model_data))
+#People who self-report a clinical diagnosis of Type 2, are NOT on insulin at treatment, or with a UCPCR of >0.6 at first visit
+processed_data = model_data %>%
+  filter(Insulin == "No" & Initial_diabetes_Insulin == ""  | Type_of_diabetes == "Type 2" | UCPCR > 0.6)
 
+#merge those who have time to insulin > 6 month (0 individuals) with processed_data
+processed_data = rbind(processed_data, model_data[model_data$Time_to_insulin > (365.25/12),])
+
+#segregate groups into antibody+ and antibody-
+processed_data_a_positive = processed_data[processed_data$GADA_Status == 1 | processed_data$IA2A_Status == 1,]
+processed_data_a_negative = processed_data[processed_data$GADA_Status == 0 | processed_data$IA2A_Status == 0,]
+
+processed_data %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  filter(value < 20) %>%
+  # mutate(key = as.numeric(key)) %>%
+  ggplot2::ggplot() +
+  geom_violin(aes(x = key, y = value)) +
+  #geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol')
+#geom_point(aes(x = key, y = value)) +
+#geom_smooth(aes(x = key, y = value), method = 'lm')
+
+processed_data_a_positive %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  filter(value < 20) %>%
+  # mutate(key = as.numeric(key)) %>%
+  ggplot2::ggplot() +
+  #geom_violin(aes(x = key, y = value)) +
+  geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol')
+  #geom_point(aes(x = key, y = value)) +
+  #geom_smooth(aes(x = key, y = value), method = 'lm')
+
+processed_data_a_negative %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  filter(value < 20) %>%
+  # mutate(key = as.numeric(key)) %>%
+  ggplot2::ggplot() +
+  geom_violin(aes(x = key, y = value)) +
+  #geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol')
+#geom_point(aes(x = key, y = value)) +
+#geom_smooth(aes(x = key, y = value), method = 'lm')
 
 ################################################################################
 ########################### Visualise Results ##################################
@@ -249,4 +301,66 @@ plot(model_data$Model4Prob[model_data$AvgAnnualRUCPCR <0], model_data$AvgAnnualR
      xlab = 'Clinical + AutoAntibody Model Probability',
      ylab = 'Average Rate of Loss in C-Peptide', 
      pch = 16)
+
+
+par(mfrow = c(2,1)) #Allows us to visualise 4 plots at once
+describe(model_data$V1_V2_UCPCR_Change[model_data$Model4Prob < 0.1])
+describe(model_data$V1_V2_UCPCR_Change[model_data$Model4Prob > 0.9])
+
+#filter insulin treated - because deficiency deteriorates
+#Insulin at diagnsosis
+#does prediction model identify those who develop severe insulin deficiency
+#severe insulin deficiency = <0.2 v3_UCPCR
+
+#date_continuous needs to be >4 weeks since diagnosis/v1
+(model_data$Date_continuous_insulin[model_data$V2Insulin == "Yes" & model_data$Insulin == "No"])
+(model_data$Date_continuous_insulin[model_data$V3Insulin == "Yes" & model_data$Insulin == "No"])
+(model_data$Date_continuous_insulin[model_data$Insulin == "No"])
+
+#how many people on insulin at diagnosis, v1 v2
+#mean time to insulin
+#on insulin 
+
+dev.off()
+
+plot(model_data$Model1Prob[model_data$Insulin == "No"], model_data$V3UCPCR[model_data$Insulin == "Yes"])
+
+hist(model_data$V1_V2_UCPCR_Change[model_data$Model4LogOR < 0.1])
+hist(model_data$V1_V2_UCPCR_Change[model_data$Model4LogOR > 0.9])
+
+
+
+################################################################################
+################### CURRENT SECTION ########################################
+################################################################################
+### - 
+################################################################################
+
+
+
+
+model_data %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("1" = "UCPCR") %>%
+  rename("2" = "V2UCPCR") %>%
+  rename("3" = "V3UCPCR") %>%
+  gather() %>%
+  filter(value < 20) %>%
+  mutate(key = as.numeric(key)) %>%
+  ggplot2::ggplot() +
+  geom_point(aes(x = key, y = value)) +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+
+p_load(tidyr)
+gathered = gather(model_data, key = "visit", value = "ucpcr", 
+       UCPCR, V2UCPCR, V3UCPCR)
+
+ggplot(model_data, aes(gp, y)) +
+  geom_point() +
+  geom_point(data = ds, aes(y = mean), colour = 'red', size = 3)
+
+#compare models against UCPCR data
+plot(model_data$Model4Prob, )
+
 
