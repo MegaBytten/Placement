@@ -6,9 +6,8 @@
 ### - In equations where AGE is used, AgeatDiag was used instead - need to fix!
 ################################################################################
 ################################################################################
-library(pacman)
 library(tidyverse)
-p_load('rio')
+library(rio)
 
 filepath = '~/Downloads/Insulin secretion model/startight Aug 22 comma separated.csv'
 my_data <- import(filepath)
@@ -22,7 +21,6 @@ View(my_data)
 ### - This section creates new columns to be used in the models
 ################################################################################
 ################################################################################
-
 #Islet autoantibodies were considered positive if: 
 #GADA ≥11 units/mL, IA2A ≥7.5 units/mL and ZNT8A ≥65 units/mL in those aged up to 30 years 
 #and ≥10 units/mL in those aged ≥30 years (17, 18)
@@ -65,9 +63,6 @@ model_data$BMI[is.na(model_data$BMI)] = model_data$Weight[is.na(model_data$BMI)]
 
 #Add new column containing model prediction score
 model_data$Model1LogOR = 37.94 + (-5.09 * log(model_data$AgeatDiagnosis)) + (-6.34 * log(model_data$BMI))
-
-#Visualise the data below
-plot(model_data$Model1LogOR, model_data$BMI)
 
 
 ################################################################################
@@ -149,28 +144,166 @@ write.csv(model_data$Model4Prob[!is.na(model_data$Model4Prob)], '~/Downloads/aut
 
 
 ################################################################################
+######################### Calculating UCPCR Slopes #############################
+################################################################################
+### - Calculate average annual change in UCPCR per person
+
+# Calculate UCPCR Change from Diagnosis (V1) to V2
+model_data$V1_V2_UCPCR_Change[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] = model_data$V2UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] - model_data$UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)]
+
+# Calculate UCPCR Change from V2 to V3
+model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] = model_data$V3UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] - model_data$V2UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)]
+
+# Calculate annual avg rate of UCPCR Change for those who HAVE V1 -> V2 data
+model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change)] = model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change)]
+
+#Calculate annual avg rate of UCPCR change for those who HAVE V2 -> V3 data
+model_data$AvgAnnualRUCPCR[!is.na(model_data$V2_V3_UCPCR_Change)] = model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2_V3_UCPCR_Change)]
+
+#Calculate annual avg rate of UCPCR change for those who HAVE V1 -> V2 -> V3 data
+model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] = (model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] + model_data$V2_V3_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)]) / 2
+
+################################################################################
 ######## Filtering, cleaning and visualising Results ###########################
 ################################################################################
+### - Plot 15 random people's annual change in UCPCR
+###   > 5 people type 1 diabetes
+###   > 5 people high risk model with initial type 2 diabetes diagnosis
+###   > 5 people low risk model with initial type 2 diabetes diagnosis
 
 #Find people who were diagnosed type 2 now going on insulin within 2 years
 
 #Find people with continuous_insulin data that began insulin after 6 months of diagnosis
-model_data$Time_to_insulin = difftime(as.Date(model_data$Date_continuous_insulin, "%d-%B-%Y"),
-                                      as.Date(model_data$Date_Visit, "%d-%B-%Y"),
-                                      units = 'days')
+#model_data$Time_to_insulin = difftime(as.Date(model_data$Date_continuous_insulin, "%d-%B-%Y"),
+                                     # as.Date(model_data$Date_Visit, "%d-%B-%Y"),
+                                     # units = 'days')
 
 #People who self-report a clinical diagnosis of Type 2, are NOT on insulin at treatment, or with a UCPCR of >0.6 at first visit
-processed_data = model_data %>%
-  filter(Insulin == "No" & Initial_diabetes_Insulin == ""  | Type_of_diabetes == "Type 2" | UCPCR > 0.6)
+type_2_group = model_data %>%
+  filter(Type_of_diabetes == "Type 2")
 
-#merge those who have time to insulin > 6 month (0 individuals) with processed_data
-processed_data = rbind(processed_data, model_data[model_data$Time_to_insulin > (365.25/12),])
+#Re-calculate time_to_insulin as SWITCH to insulin
+type_2_group$Time_to_insulin = NA
+type_2_group$Time_to_insulin[type_2_group$Insulin == "Yes"] = 0
+type_2_group$Time_to_insulin[type_2_group$V2Insulin == "Yes"] = 1
+type_2_group$Time_to_insulin[type_2_group$V2Insulin == "No" & type_2_group$V3Insulin == "Yes"] = 2
 
-#segregate groups into antibody+ and antibody-
-processed_data_a_positive = processed_data[processed_data$GADA_Status == 1 | processed_data$IA2A_Status == 1,]
-processed_data_a_negative = processed_data[processed_data$GADA_Status == 0 | processed_data$IA2A_Status == 0,]
+ggplot(type_2_group,aes(y=AvgAnnualRUCPCR,x=Time_to_insulin))+geom_point()+geom_smooth(method="lm")
 
-processed_data %>%
+
+type_2_group %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR)) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot() +
+  #geom_violin(aes(x = key, y = value)) +
+  #geom_boxplot(aes(x = key, y = value)) +
+  geom_point(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#plot slopes from anyone diagnosed as type 2
+plot(type_2_group$Model4Prob, type_2_group$AvgAnnualRUCPCR)
+
+#plot slopes from anyone high model risk
+plot(type_2_group$Model4Prob[(type_2_group$Model4Prob > 0.6 & type_2_group$Model4Prob < 0.9) ], type_2_group$AvgAnnualRUCPCR[(type_2_group$Model4Prob > 0.6 & type_2_group$Model4Prob < 0.9)])
+  
+
+library(lme4)
+
+type_2_group$V1 = 0
+type_2_group$V1[!is.na(type_2_group$UCPCR)] = 1 
+
+type_2_group$V2 = 0 
+type_2_group$V2[!is.na(type_2_group$V2UCPCR)] = 1 
+
+type_2_group$V3 = 0 
+type_2_group$V3[!is.na(type_2_group$V3UCPCR)] = 1 
+
+model_data$V1 = 0
+model_data$V1[!is.na(type_2_group$UCPCR)] = 1 
+
+model_data$V2 = 0 
+model_data$V2[!is.na(type_2_group$V2UCPCR)] = 1 
+
+model_data$V3 = 0 
+model_data$V3[!is.na(type_2_group$V3UCPCR)] = 1 
+
+
+#type_2 dataset
+type_2 = type_2_group %>%
+  select(AvgAnnualRUCPCR, V1, V2, V3, Time_to_insulin) %>%
+  filter(!is.na(AvgAnnualRUCPCR) & !is.na(Time_to_insulin))
+
+plot(type_2$Time_to_insulin, type_2$AvgAnnualRUCPCR)
+type_2_lm = lm(unlist(AvgAnnualRUCPCR) ~ Time_to_insulin + (1|V1|V2|V3), data = type_2)
+
+#Full dataset
+type_1 = model_data %>%
+  select(AvgAnnualRUCPCR, V1, V2, V3, Time_to_insulin, Type_of_diabetes) %>%
+  filter(!is.na(AvgAnnualRUCPCR) & !is.na(Time_to_insulin) & Type_of_diabetes == "Type 1")
+
+plot(type_1$Time_to_insulin, type_1$AvgAnnualRUCPCR)
+type_1_lm = lm(unlist(AvgAnnualRUCPCR) ~ Time_to_insulin + (1|V1|V2|V3), data = type_1)
+  
+
+#VISUALIZE
+ggplot(type_1,aes(y=AvgAnnualRUCPCR,x=Time_to_insulin))+geom_point()+geom_smooth(method="lm")
+ggplot(type_2,aes(y=AvgAnnualRUCPCR,x=Time_to_insulin))+geom_point()+geom_smooth(method="lm")
+
+#new_data = cbind.data.frame(type_2_group$AvgAnnualRUCPCR[!is.na(type_2_group$AvgAnnualRUCPCR & !is.na(type_2_group$Gender))], type_2_group$Gender[!is.na(type_2_group$AvgAnnualRUCPCR & !is.na(type_2_group$Gender))])
+#lmer(new_data$`type_2_group$AvgAnnualRUCPCR[!is.na(type_2_group$AvgAnnualRUCPCR & ` ~ new_data$`type_2_group$Gender[!is.na(type_2_group$AvgAnnualRUCPCR & !is.na(type_2_group$Gender))]` + (1 | new_data$`type_2_group$Gender[!is.na(type_2_group$AvgAnnualRUCPCR & !is.na(type_2_group$Gender))]`))
+
+
+
+type_2_group %>%
   select(UCPCR, V2UCPCR, V3UCPCR) %>%
   rename("Visit 1" = "UCPCR") %>%
   rename("Visit 2" = "V2UCPCR") %>%
@@ -186,7 +319,7 @@ processed_data %>%
 #geom_point(aes(x = key, y = value)) +
 #geom_smooth(aes(x = key, y = value), method = 'lm')
 
-processed_data_a_positive %>%
+type_2_group_a_positive %>%
   select(UCPCR, V2UCPCR, V3UCPCR) %>%
   rename("Visit 1" = "UCPCR") %>%
   rename("Visit 2" = "V2UCPCR") %>%
@@ -202,7 +335,7 @@ processed_data_a_positive %>%
   #geom_point(aes(x = key, y = value)) +
   #geom_smooth(aes(x = key, y = value), method = 'lm')
 
-processed_data_a_negative %>%
+type_2_group_a_negative %>%
   select(UCPCR, V2UCPCR, V3UCPCR) %>%
   rename("Visit 1" = "UCPCR") %>%
   rename("Visit 2" = "V2UCPCR") %>%
