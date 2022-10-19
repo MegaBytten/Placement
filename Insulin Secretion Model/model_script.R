@@ -133,14 +133,6 @@ model_data$Model3Prob[!is.na(model_data$Model3LogOR)] = exp(model_data$Model3Log
 model_data$Model4Prob[!is.na(model_data$Model4LogOR)] = exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) / (1 + exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) )
 
 
-################################################################################
-############# Export results for Descriptive stats in Python ###################
-################################################################################
-
-write.csv(model_data$Model1Prob[!is.na(model_data$Model1Prob)], '~/Downloads/autoantibody_model_1_data.csv')
-write.csv(model_data$Model2Prob[!is.na(model_data$Model2Prob)], '~/Downloads/autoantibody_model_2_data.csv')
-write.csv(model_data$Model3Prob[!is.na(model_data$Model3Prob)], '~/Downloads/autoantibody_model_3_data.csv')
-write.csv(model_data$Model4Prob[!is.na(model_data$Model4Prob)], '~/Downloads/autoantibody_model_4_data.csv')
 
 
 
@@ -481,182 +473,11 @@ individual = not_insulin %>%
 describe(individual)
 describe(as.numeric(individual$Time_to_insulin))
   
-################################################################################
-######################### Calculating UCPCR Slopes #############################
-################################################################################
-### - Calculate average annual change in UCPCR per person
-
-# Calculate UCPCR Change from Diagnosis (V1) to V2
-model_data$V1_V2_UCPCR_Change[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] = model_data$V2UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] - model_data$UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)]
-
-# Calculate UCPCR Change from V2 to V3
-model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] = model_data$V3UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] - model_data$V2UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)]
-
-# Calculate annual avg rate of UCPCR Change for those who HAVE V1 -> V2 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change)] = model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change)]
-
-#Calculate annual avg rate of UCPCR change for those who HAVE V2 -> V3 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V2_V3_UCPCR_Change)] = model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2_V3_UCPCR_Change)]
-
-#Calculate annual avg rate of UCPCR change for those who HAVE V1 -> V2 -> V3 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] = (model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] + model_data$V2_V3_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)]) / 2
-
-################################################################################
-############ Cleaning Data and Descriptive Stats ###############################
-################################################################################
-### - Segregating groups into type_1 and type_2
-### - Obtaining descriptive stats on BMI, Age, HbA1c, Antibodies, UCPCR, and risk
-### - Obtaining further descriptive stats on High/Low risk type_2
-
-#People who self-report a clinical diagnosis of Type 1 AND are ON insulin
-type_1_group = model_data %>%
-  filter(Type_of_diabetes == "Type 1" & Insulin == "Yes")
-
-#People who self-report a clinical diagnosis of Type 2 AND are NOT on insulin at treatment
-type_2_group = model_data %>%
-  filter(Type_of_diabetes == "Type 2" & Insulin == "No")
-
-#General summary stats - Type_1
-nrow(type_1_group) # n
-nrow(type_1_group[type_1_group$Insulin == "Yes",]) # # on insulin
-nrow(type_1_group[type_1_group$GADA_Status == 1 & type_1_group$IA2A_Status == 1 ,]) # # with both antibodies positive
-type_1_group %>% #remainder of descriptive stats
-  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
-  describe()
-
-#General summary stats - Type_2
-nrow(type_2_group) # n
-nrow(type_2_group[type_2_group$Insulin == "Yes",]) # # on insulin
-nrow(type_2_group[type_2_group$GADA_Status == 1 & type_2_group$IA2A_Status == 1 ,]) # # with both antibodies positive
-type_2_group %>% #remainder of descriptive stats
-  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
-  describe()
-
-#Specific summary stats - High risk Type_2 (>0.6)
-type_2_group %>% # n
-  filter(Model4Prob > 0.6) %>%
-  nrow()
-
-type_2_group %>% # # where both antibody positive
-  filter(Model4Prob > 0.6) %>%
-  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
-  nrow()
-
-type_2_group %>% #remainder of descriptive stats
-  filter(Model4Prob > 0.6) %>%
-  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
-  describe()
-
-#Specific summary stats - Low risk Type_2 (<0.4)
-type_2_group %>% # n
-  filter(Model4Prob < 0.4) %>%
-  nrow()
-
-type_2_group %>% # # where both antibody positive
-  filter(Model4Prob < 0.4) %>%
-  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
-  nrow()
-
-type_2_group %>% #remainder of descriptive stats
-  filter(Model4Prob < 0.4) %>%
-  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
-  describe()
-
-
-################################################################################
-#################### Graphing and Visualizing ##################################
-################################################################################
-### - Graphing type_1 vs type_2 UCPCR
-### - Graphing high risk T2 vs low risk T2 UCPCR
-################################################################################
-
-#Graphing T1 UCPCR
-type_1_group %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR)) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot() +
-  geom_boxplot(aes(x = key, y = value)) +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
-
-#Graphing T2 UCPCR
-type_2_group %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot() +
-  geom_boxplot(aes(x = key, y = value)) +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
-
-
-# Graphing LOW risk T2 UCPCR
-type_2_group %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & Model4Prob < 0.4 & V3UCPCR < 20) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot() +
-  geom_boxplot(aes(x = key, y = value)) +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
 
-# Graphing HIGH risk T2 UCPCR
-type_2_group %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & Model4Prob > 0.6 & V3UCPCR < 20) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot() +
-  geom_boxplot(aes(x = key, y = value)) +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
 
-################################################################################
-################### Generating Individual Slopes ###############################
-################################################################################
-### - Generate idividual slopes for T1 individuals with 3 visits' UCPCR data
-### - Generate individual slopes for T2 individuals with 3 visits' UCPCR data
-### - Validate whether 'high risk' individuals match T1 UCPCR change
-################################################################################
 
-#Finding individuals with 3 visits worth of UCPCR -  T1
-type_1_group$StartRightID[!is.na(type_1_group$UCPCR) & !is.na(type_1_group$V2UCPCR) & !is.na(type_1_group$V3UCPCR)]
-type_1_IDs = list("SR0041", 'SR0045', 'SR0060', 'SR0076', 'SR0077', 'SR0078', 'SR0080', 'SR0096')
 
-#Finding individuals with 3 visits worth of UCPCR - T2
-type_2_group$StartRightID[!is.na(type_2_group$UCPCR) & !is.na(type_2_group$V2UCPCR) & !is.na(type_2_group$V3UCPCR) & type_2_group$Model4Prob > 0.6]
-high_risk_IDs = list("SR0522", "SR0937", "SR1036", "SR1157", "SR1254", "SR1712", "SR1727", "SR2102")
 
-# High Risk slopes { just change the array[index] up to a max of 8 }
-type_2_group %>%
-  filter(StartRightID == high_risk_IDs[8]) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot(aes(x = key, y = value, group = 1)) +
-  #geom_point() +
-  geom_line() +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  ylim(0,20)
 
 
 
@@ -664,22 +485,9 @@ type_2_group %>%
 
 
 
-#people with decline in UCPCR
-(type_2_group$V1_V2_UCPCR_Change[type_2_group$V1_V2_UCPCR_Change < 0])
-type_2_group %>%
-  filter(type_2_group$V1_V2_UCPCR_Change < 0 & type_2_group$V2_V3_UCPCR_Change < 0) %>%
-  ggplot() +
-    geom_point(aes(x = Model4Prob, y= V1_V2_UCPCR_Change))
-  
 
 
 
-type_2_group %>%
-  filter(type_2_group$V1_V2_UCPCR_Change < 0 & type_2_group$V2_V3_UCPCR_Change < 0) %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20) %>% #remove no/bad UCPCR data
-  #filter(Model4Prob > 0.2 & Model4Prob < 0.8) %>% # remove probability extremes
-  ggplot() +
-    geom_point(aes(x = Model4Prob, y= AvgAnnualRUCPCR))
 
 
 
@@ -688,161 +496,8 @@ type_2_group %>%
 
 
 
-#Graph boxplot UCPCR/visit data for those of high risk (<0.4)
-type_2_group %>%
-  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20 & Model4Prob > 0.7) %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("Visit 1" = "UCPCR") %>%
-  rename("Visit 2" = "V2UCPCR") %>%
-  rename("Visit 3" = "V3UCPCR") %>%
-  gather() %>%
-  ggplot2::ggplot() +
-  #geom_violin(aes(x = key, y = value)) +
-  geom_boxplot(aes(x = key, y = value)) +
-  #geom_point(aes(x = key, y = value)) +
-  xlab('Visits') +
-  ylab('UCPCR mol/mmol') +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-################################################################################
-######################## Analyzing Risk Strata #################################
-################################################################################
-### - Create new column/variable Time_to_insulin
-###   > done by finding difference between date of continuous insulin and
-###     date of diagnosis
-### - Create new dataframes for each strata
-###   > Selects data used in descriptive stats
-###   > BMI, IA2, GAD, Age, ModelProb, Insulin, Type of Diabetes
-### - Run lots of descriptive stats on the different features for each strata
-################################################################################
-
-#Creating Time_to_insulin variable
-model_data$Time_to_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''] = difftime(as.Date(model_data$Date_continuous_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y"), as.Date(model_data$DateofDiagnosis[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y") , units = 'weeks')
-model_data$Time_to_insulin[model_data$Time_to_insulin < 0] = 0
-
-#select everyone with switch to insulin OVER 3 months
-model_data$Time_to_insulin[!is.na(model_data$Time_to_insulin) & model_data$Time_to_insulin > (52/12)*3]
-
-
-#descriptive stats for High Risk group
-high_risk = model_data %>%
-  filter(Model4Prob >= 0.667) %>%
-  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
-         Type_of_diabetes, V2Insulin, V3Insulin)
-nrow(high_risk)
-describe(high_risk)
-high_risk %>%
-  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
-  nrow()
-high_risk %>%
-  filter(Insulin == "Yes") %>%
-  nrow()
-high_risk%>%
-  filter(Type_of_diabetes == "Type 1") %>%
-  nrow()
-high_risk%>%
-  filter(Type_of_diabetes == "Type 2") %>%
-  nrow()
-describe(as.numeric(high_risk$Time_to_insulin))
-#calculate how many switched to insulin
-high_risk %>%
-  filter(Insulin == "No") %>%
-  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  nrow()
-#calculate how many T2 switched to insulin
-high_risk %>%
-  filter(Insulin == "No" & Type_of_diabetes == "Type 2") %>%
-  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  nrow()
-
-
-#descriptive stats for Mid Risk group
-mid_risk = model_data %>%
-  filter(Model4Prob < 0.667 & Model4Prob > 0.333) %>%
-  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
-         Type_of_diabetes, V2Insulin, V3Insulin)
-nrow(mid_risk)
-describe(mid_risk)
-mid_risk %>%
-  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
-  nrow()
-mid_risk %>%
-  filter(Insulin == "Yes") %>%
-  nrow()
-mid_risk%>%
-  filter(Type_of_diabetes == "Type 1") %>%
-  nrow()
-mid_risk%>%
-  filter(Type_of_diabetes == "Type 2") %>%
-  nrow()
-describe(as.numeric(mid_risk$Time_to_insulin))
-mid_risk %>%
-  filter(Insulin == "No") %>%
-  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  nrow()
-#calculate how many T2 switched to insulin
-mid_risk %>%
-  filter(Insulin == "No" & Type_of_diabetes == "Type 2") %>%
-  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  nrow()
-
-nrow(my_data)
-my_data$RecruitmentSite
-
-
-
-
-#descriptive stats for Low Risk group
-low_risk = model_data %>%
-  filter(Model4Prob <= 0.333) %>%
-  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
-         Type_of_diabetes, V2Insulin, V3Insulin)
-nrow(low_risk)
-describe(low_risk)
-low_risk %>%
-  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
-  nrow()
-low_risk %>%
-  filter(Insulin == "Yes") %>%
-  nrow()
-low_risk%>%
-  filter(Type_of_diabetes == "Type 1") %>%
-  nrow()
-low_risk%>%
-  filter(Type_of_diabetes == "Type 2") %>%
-  nrow()
-describe(as.numeric(low_risk$Time_to_insulin))
-low_risk %>%
-  filter(Insulin == "No") %>%
-  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  nrow()
-
-#Type 1 diabetes risk score
-model_data$GRS
 
 
 
@@ -1020,51 +675,6 @@ hist(model_data$Model4Prob,
 ### - Plotting prediction models against C-peptide change
 ################################################################################
 
-# Calculate UCPCR Change from Diagnosis (V1) to V2
-model_data$V1_V2_UCPCR_Change[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] = model_data$V2UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)] - model_data$UCPCR[!is.na(model_data$UCPCR) & !is.na(model_data$V2UCPCR)]
-
-# Calculate UCPCR Change from V2 to V3
-model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] = model_data$V3UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)] - model_data$V2UCPCR[!is.na(model_data$V2UCPCR) & !is.na(model_data$V3UCPCR)]
-
-# Calculate annual avg rate of UCPCR Change for those who HAVE V1 -> V2 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change)] = model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change)] / 2
-
-#Calculate annual avg rate of UCPCR change for those who HAVE V2 -> V3 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V2_V3_UCPCR_Change)] = model_data$V2_V3_UCPCR_Change[!is.na(model_data$V2_V3_UCPCR_Change)] / 2
-
-#Calculate annual avg rate of UCPCR change for those who HAVE V1 -> V2 -> V3 data
-model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] = (model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] + model_data$V2_V3_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)]) / 3
-
-#Visualise avg change of UCPCR
-hist(model_data$AvgAnnualRUCPCR,
-     xlim = c(-6,10))
-
-#Plot UCPCR change against prediction Model
-plot(model_data$Model1Prob, model_data$AvgAnnualRUCPCR,
-     xlab = 'Clinical Features Model Probability',
-     ylab = 'Average Rate of Change in C-Peptide',
-     pch = 16)
-plot(model_data$Model2Prob, model_data$AvgAnnualRUCPCR,
-     xlab = 'Clinical + GAD AutoAntibody Model Probability',
-     ylab = 'Average Rate of Change in C-Peptide', 
-     pch = 16)
-plot(model_data$Model3Prob, model_data$AvgAnnualRUCPCR,
-     xlab = 'Clinical + ZNT8 AutoAntibody Model Probability',
-     ylab = 'Average Rate of Change in C-Peptide', 
-     pch = 16)
-plot(model_data$Model4Prob, model_data$AvgAnnualRUCPCR,
-     xlab = 'Clinical + AutoAntibody Model Probability',
-     ylab = 'Average Rate of Change in C-Peptide', 
-     pch = 16)
-
-
-#Plot UCPCR LOSS against prediction model
-plot(model_data$Model4Prob[model_data$AvgAnnualRUCPCR <0], model_data$AvgAnnualRUCPCR[model_data$AvgAnnualRUCPCR <0],
-     xlab = 'Clinical + AutoAntibody Model Probability',
-     ylab = 'Average Rate of Loss in C-Peptide', 
-     pch = 16)
-
-
 par(mfrow = c(2,1)) #Allows us to visualise 4 plots at once
 describe(model_data$V1_V2_UCPCR_Change[model_data$Model4Prob < 0.1])
 describe(model_data$V1_V2_UCPCR_Change[model_data$Model4Prob > 0.9])
@@ -1089,54 +699,4 @@ plot(model_data$Model1Prob[model_data$Insulin == "No"], model_data$V3UCPCR[model
 
 hist(model_data$V1_V2_UCPCR_Change[model_data$Model4LogOR < 0.1])
 hist(model_data$V1_V2_UCPCR_Change[model_data$Model4LogOR > 0.9])
-
-
-
-################################################################################
-################### CURRENT SECTION ########################################
-################################################################################
-### - 
-################################################################################
-
-
-
-
-model_data %>%
-  select(UCPCR, V2UCPCR, V3UCPCR) %>%
-  rename("1" = "UCPCR") %>%
-  rename("2" = "V2UCPCR") %>%
-  rename("3" = "V3UCPCR") %>%
-  gather() %>%
-  filter(value < 20) %>%
-  mutate(key = as.numeric(key)) %>%
-  ggplot2::ggplot() +
-  geom_point(aes(x = key, y = value)) +
-  geom_smooth(aes(x = key, y = value), method = 'lm')
-
-
-p_load(tidyr)
-gathered = gather(model_data, key = "visit", value = "ucpcr", 
-       UCPCR, V2UCPCR, V3UCPCR)
-
-ggplot(model_data, aes(gp, y)) +
-  geom_point() +
-  geom_point(data = ds, aes(y = mean), colour = 'red', size = 3)
-
-#compare models against UCPCR data
-plot(model_data$Model4Prob, )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
