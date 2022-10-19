@@ -143,6 +143,344 @@ write.csv(model_data$Model3Prob[!is.na(model_data$Model3Prob)], '~/Downloads/aut
 write.csv(model_data$Model4Prob[!is.na(model_data$Model4Prob)], '~/Downloads/autoantibody_model_4_data.csv')
 
 
+
+################################################################################
+################# Comparing 2 Models against antibodies ########################
+################################################################################
+### - Clin features model
+### - Clin features + autoantibodies (GAD IA2)
+### - compared to using GAD and IA2
+################################################################################
+
+#General descriptive stats about non-insulin group
+model_data%>%
+  filter(Initial_diabetes_Insulin != "Insulin") %>%
+  nrow()
+
+model_data %>%
+  filter(Initial_diabetes_Insulin != "Insulin") %>%
+  select(GRS) %>%
+  describe()
+
+#creating new dataframe for use 
+not_insulin = model_data %>%
+  filter(Initial_diabetes_Insulin != "Insulin")
+
+# visualization
+not_insulin %>%
+  filter(!is.na(Model4Prob) & !is.na(Model1Prob)) %>%
+  select(Model1Prob, Model4Prob) %>%
+  rename("Clin Features Model" = "Model1Prob") %>%
+  rename("Clin + Antibody Model" = "Model4Prob") %>%
+  gather() %>%
+  ggplot2::ggplot() +
+  geom_violin(aes(x = key, y = value)) +
+  xlab('Models') +
+  ylab('Probability') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+################################## MODEL 1 #####################################  
+#descriptive stats for High Risk group
+high_risk = not_insulin %>%
+  filter(Model1Prob >= 0.667) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model1Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(high_risk)
+describe(high_risk)
+#How many were ONE antibody+
+high_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+high_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+high_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+high_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(high_risk$Time_to_insulin))
+#calculate how many switched to insulin
+high_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Mid Risk group
+mid_risk = not_insulin %>%
+  filter(Model1Prob < 0.667 & Model1Prob > 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model1Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(mid_risk)
+describe(mid_risk)
+#How many were ONE antibody+
+mid_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+mid_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+mid_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+mid_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(mid_risk$Time_to_insulin))
+mid_risk %>%
+  filter(Insulin == "No") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+# Calculate how many switched to insulin
+mid_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Low Risk group
+low_risk = not_insulin %>%
+  filter(Model1Prob <= 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model1Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(low_risk)
+describe(low_risk)
+#How many were ONE antibody+
+low_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+low_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+low_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+low_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(low_risk$Time_to_insulin))
+low_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+
+################################## MODEL 2 #####################################  
+#descriptive stats for High Risk group
+high_risk = not_insulin %>%
+  filter(Model4Prob >= 0.667) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(high_risk)
+describe(high_risk)
+#How many were ONE antibody+
+high_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+high_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+high_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(high_risk$Time_to_insulin))
+#calculate how many switched to insulin
+high_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Mid Risk group
+mid_risk = not_insulin %>%
+  filter(Model4Prob < 0.667 & Model1Prob > 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(mid_risk)
+describe(mid_risk)
+#How many were ONE antibody+
+mid_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+mid_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+mid_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+mid_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(mid_risk$Time_to_insulin))
+mid_risk %>%
+  filter(Insulin == "No") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+# Calculate how many switched to insulin
+mid_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Low Risk group
+low_risk = not_insulin %>%
+  filter(Model4Prob <= 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(low_risk)
+describe(low_risk)
+#How many were ONE antibody+
+low_risk %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+low_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+low_risk %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(low_risk$Time_to_insulin))
+low_risk %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+################################## MODEL 3 #####################################  
+#AUTO ANTIBODIES
+#descriptive stats for High Risk group
+positive = not_insulin %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Model1Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(positive)
+describe(positive)
+positive%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+positive%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(positive$Time_to_insulin))
+#calculate how many switched to insulin
+positive %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Mid Risk group
+negative = not_insulin %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Model1Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(negative)
+describe(negative)
+negative%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+negative%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(negative$Time_to_insulin))
+#calculate how many switched to insulin
+negative %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#Investigating group who switched to insulin
+patients_switched = not_insulin %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model1Prob, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+
+nrow(patients_switched)
+describe(patients_switched)
+#How many were ONE antibody+
+patients_switched %>%
+  filter(GADA_Status == 1 | IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody +
+patients_switched %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+# How many were BOTH antibody -
+patients_switched %>%
+  filter(GADA_Status == 0 & IA2A_Status == 0) %>%
+  nrow()
+patients_switched%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+patients_switched%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(patients_switched$Time_to_insulin))
+patients_switched %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+switched_list = list('SR3071', 'SR3083', 'SR3152', 'SR3156', 'SR3157')
+#Investigating individuals who switched to insulin
+not_insulin %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  select(StartRightID)
+
+individual = not_insulin %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  filter(StartRightID == switched_list[5]) %>%
+  select(BMI, AgeatDiagnosis, Time_to_insulin, HbA1c_at_diagnosis, GADA_Status,
+         IA2A_Status, Model1Prob, Model4Prob, Type_of_diabetes)
+
+describe(individual)
+describe(as.numeric(individual$Time_to_insulin))
+  
 ################################################################################
 ######################### Calculating UCPCR Slopes #############################
 ################################################################################
@@ -164,34 +502,76 @@ model_data$AvgAnnualRUCPCR[!is.na(model_data$V2_V3_UCPCR_Change)] = model_data$V
 model_data$AvgAnnualRUCPCR[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] = (model_data$V1_V2_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)] + model_data$V2_V3_UCPCR_Change[!is.na(model_data$V1_V2_UCPCR_Change) & !is.na(model_data$V2_V3_UCPCR_Change)]) / 2
 
 ################################################################################
-######## Filtering, cleaning and visualising Results ###########################
+############ Cleaning Data and Descriptive Stats ###############################
 ################################################################################
-### - Plot 15 random people's annual change in UCPCR
-###   > 5 people type 1 diabetes
-###   > 5 people high risk model with initial type 2 diabetes diagnosis
-###   > 5 people low risk model with initial type 2 diabetes diagnosis
+### - Segregating groups into type_1 and type_2
+### - Obtaining descriptive stats on BMI, Age, HbA1c, Antibodies, UCPCR, and risk
+### - Obtaining further descriptive stats on High/Low risk type_2
 
-#Find people who were diagnosed type 2 now going on insulin within 2 years
+#People who self-report a clinical diagnosis of Type 1 AND are ON insulin
+type_1_group = model_data %>%
+  filter(Type_of_diabetes == "Type 1" & Insulin == "Yes")
 
-#Find people with continuous_insulin data that began insulin after 6 months of diagnosis
-#model_data$Time_to_insulin = difftime(as.Date(model_data$Date_continuous_insulin, "%d-%B-%Y"),
-                                     # as.Date(model_data$Date_Visit, "%d-%B-%Y"),
-                                     # units = 'days')
-
-#People who self-report a clinical diagnosis of Type 2, are NOT on insulin at treatment, or with a UCPCR of >0.6 at first visit
+#People who self-report a clinical diagnosis of Type 2 AND are NOT on insulin at treatment
 type_2_group = model_data %>%
-  filter(Type_of_diabetes == "Type 2")
+  filter(Type_of_diabetes == "Type 2" & Insulin == "No")
 
-#Re-calculate time_to_insulin as SWITCH to insulin
-type_2_group$Time_to_insulin = NA
-type_2_group$Time_to_insulin[type_2_group$Insulin == "Yes"] = 0
-type_2_group$Time_to_insulin[type_2_group$V2Insulin == "Yes"] = 1
-type_2_group$Time_to_insulin[type_2_group$V2Insulin == "No" & type_2_group$V3Insulin == "Yes"] = 2
+#General summary stats - Type_1
+nrow(type_1_group) # n
+nrow(type_1_group[type_1_group$Insulin == "Yes",]) # # on insulin
+nrow(type_1_group[type_1_group$GADA_Status == 1 & type_1_group$IA2A_Status == 1 ,]) # # with both antibodies positive
+type_1_group %>% #remainder of descriptive stats
+  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
+  describe()
 
-ggplot(type_2_group,aes(y=AvgAnnualRUCPCR,x=Time_to_insulin))+geom_point()+geom_smooth(method="lm")
+#General summary stats - Type_2
+nrow(type_2_group) # n
+nrow(type_2_group[type_2_group$Insulin == "Yes",]) # # on insulin
+nrow(type_2_group[type_2_group$GADA_Status == 1 & type_2_group$IA2A_Status == 1 ,]) # # with both antibodies positive
+type_2_group %>% #remainder of descriptive stats
+  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
+  describe()
+
+#Specific summary stats - High risk Type_2 (>0.6)
+type_2_group %>% # n
+  filter(Model4Prob > 0.6) %>%
+  nrow()
+
+type_2_group %>% # # where both antibody positive
+  filter(Model4Prob > 0.6) %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+
+type_2_group %>% #remainder of descriptive stats
+  filter(Model4Prob > 0.6) %>%
+  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
+  describe()
+
+#Specific summary stats - Low risk Type_2 (<0.4)
+type_2_group %>% # n
+  filter(Model4Prob < 0.4) %>%
+  nrow()
+
+type_2_group %>% # # where both antibody positive
+  filter(Model4Prob < 0.4) %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+
+type_2_group %>% #remainder of descriptive stats
+  filter(Model4Prob < 0.4) %>%
+  select(BMI, AgeatDiagnosis, GADA_Status, IA2A_Status, Insulin, HbA1c_at_diagnosis, AvgAnnualRUCPCR, Model4Prob) %>%
+  describe()
 
 
-type_2_group %>%
+################################################################################
+#################### Graphing and Visualizing ##################################
+################################################################################
+### - Graphing type_1 vs type_2 UCPCR
+### - Graphing high risk T2 vs low risk T2 UCPCR
+################################################################################
+
+#Graphing T1 UCPCR
+type_1_group %>%
   filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR)) %>%
   select(UCPCR, V2UCPCR, V3UCPCR) %>%
   rename("Visit 1" = "UCPCR") %>%
@@ -199,9 +579,127 @@ type_2_group %>%
   rename("Visit 3" = "V3UCPCR") %>%
   gather() %>%
   ggplot2::ggplot() +
+  geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+#Graphing T2 UCPCR
+type_2_group %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot() +
+  geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+
+# Graphing LOW risk T2 UCPCR
+type_2_group %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & Model4Prob < 0.4 & V3UCPCR < 20) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot() +
+  geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+# Graphing HIGH risk T2 UCPCR
+type_2_group %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & Model4Prob > 0.6 & V3UCPCR < 20) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot() +
+  geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  geom_smooth(aes(x = key, y = value), method = 'lm')
+
+################################################################################
+################### Generating Individual Slopes ###############################
+################################################################################
+### - Generate idividual slopes for T1 individuals with 3 visits' UCPCR data
+### - Generate individual slopes for T2 individuals with 3 visits' UCPCR data
+### - Validate whether 'high risk' individuals match T1 UCPCR change
+################################################################################
+
+#Finding individuals with 3 visits worth of UCPCR -  T1
+type_1_group$StartRightID[!is.na(type_1_group$UCPCR) & !is.na(type_1_group$V2UCPCR) & !is.na(type_1_group$V3UCPCR)]
+type_1_IDs = list("SR0041", 'SR0045', 'SR0060', 'SR0076', 'SR0077', 'SR0078', 'SR0080', 'SR0096')
+
+#Finding individuals with 3 visits worth of UCPCR - T2
+type_2_group$StartRightID[!is.na(type_2_group$UCPCR) & !is.na(type_2_group$V2UCPCR) & !is.na(type_2_group$V3UCPCR) & type_2_group$Model4Prob > 0.6]
+high_risk_IDs = list("SR0522", "SR0937", "SR1036", "SR1157", "SR1254", "SR1712", "SR1727", "SR2102")
+
+# High Risk slopes { just change the array[index] up to a max of 8 }
+type_2_group %>%
+  filter(StartRightID == high_risk_IDs[8]) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot(aes(x = key, y = value, group = 1)) +
+  #geom_point() +
+  geom_line() +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol') +
+  ylim(0,20)
+
+
+
+
+
+
+
+#people with decline in UCPCR
+(type_2_group$V1_V2_UCPCR_Change[type_2_group$V1_V2_UCPCR_Change < 0])
+type_2_group %>%
+  filter(type_2_group$V1_V2_UCPCR_Change < 0 & type_2_group$V2_V3_UCPCR_Change < 0) %>%
+  ggplot() +
+    geom_point(aes(x = Model4Prob, y= V1_V2_UCPCR_Change))
+  
+
+
+
+type_2_group %>%
+  filter(type_2_group$V1_V2_UCPCR_Change < 0 & type_2_group$V2_V3_UCPCR_Change < 0) %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20) %>% #remove no/bad UCPCR data
+  #filter(Model4Prob > 0.2 & Model4Prob < 0.8) %>% # remove probability extremes
+  ggplot() +
+    geom_point(aes(x = Model4Prob, y= AvgAnnualRUCPCR))
+
+
+
+
+
+
+
+
+#Graph boxplot UCPCR/visit data for those of high risk (<0.4)
+type_2_group %>%
+  filter(!is.na(UCPCR) & !is.na(V2UCPCR) & !is.na(V3UCPCR) & V3UCPCR < 20 & Model4Prob > 0.7) %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  ggplot2::ggplot() +
   #geom_violin(aes(x = key, y = value)) +
-  #geom_boxplot(aes(x = key, y = value)) +
-  geom_point(aes(x = key, y = value)) +
+  geom_boxplot(aes(x = key, y = value)) +
+  #geom_point(aes(x = key, y = value)) +
   xlab('Visits') +
   ylab('UCPCR mol/mmol') +
   geom_smooth(aes(x = key, y = value), method = 'lm')
@@ -214,6 +712,137 @@ type_2_group %>%
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+################################################################################
+######################## Analyzing Risk Strata #################################
+################################################################################
+### - Create new column/variable Time_to_insulin
+###   > done by finding difference between date of continuous insulin and
+###     date of diagnosis
+### - Create new dataframes for each strata
+###   > Selects data used in descriptive stats
+###   > BMI, IA2, GAD, Age, ModelProb, Insulin, Type of Diabetes
+### - Run lots of descriptive stats on the different features for each strata
+################################################################################
+
+#Creating Time_to_insulin variable
+model_data$Time_to_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''] = difftime(as.Date(model_data$Date_continuous_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y"), as.Date(model_data$DateofDiagnosis[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y") , units = 'weeks')
+model_data$Time_to_insulin[model_data$Time_to_insulin < 0] = 0
+
+#select everyone with switch to insulin OVER 3 months
+model_data$Time_to_insulin[!is.na(model_data$Time_to_insulin) & model_data$Time_to_insulin > (52/12)*3]
+
+
+#descriptive stats for High Risk group
+high_risk = model_data %>%
+  filter(Model4Prob >= 0.667) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(high_risk)
+describe(high_risk)
+high_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+high_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+high_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(high_risk$Time_to_insulin))
+#calculate how many switched to insulin
+high_risk %>%
+  filter(Insulin == "No") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+#calculate how many T2 switched to insulin
+high_risk %>%
+  filter(Insulin == "No" & Type_of_diabetes == "Type 2") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+
+#descriptive stats for Mid Risk group
+mid_risk = model_data %>%
+  filter(Model4Prob < 0.667 & Model4Prob > 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(mid_risk)
+describe(mid_risk)
+mid_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+mid_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+mid_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(mid_risk$Time_to_insulin))
+mid_risk %>%
+  filter(Insulin == "No") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+#calculate how many T2 switched to insulin
+mid_risk %>%
+  filter(Insulin == "No" & Type_of_diabetes == "Type 2") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+nrow(my_data)
+my_data$RecruitmentSite
+
+
+
+
+#descriptive stats for Low Risk group
+low_risk = model_data %>%
+  filter(Model4Prob <= 0.333) %>%
+  select(BMI, GADA_Status, IA2A_Status, AgeatDiagnosis, HbA1c_at_diagnosis, Model4Prob, Insulin, Time_to_insulin,
+         Type_of_diabetes, V2Insulin, V3Insulin)
+nrow(low_risk)
+describe(low_risk)
+low_risk %>%
+  filter(GADA_Status == 1 & IA2A_Status == 1) %>%
+  nrow()
+low_risk %>%
+  filter(Insulin == "Yes") %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 1") %>%
+  nrow()
+low_risk%>%
+  filter(Type_of_diabetes == "Type 2") %>%
+  nrow()
+describe(as.numeric(low_risk$Time_to_insulin))
+low_risk %>%
+  filter(Insulin == "No") %>%
+  filter(V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
+#Type 1 diabetes risk score
+model_data$GRS
 
 
 
@@ -495,5 +1124,19 @@ ggplot(model_data, aes(gp, y)) +
 
 #compare models against UCPCR data
 plot(model_data$Model4Prob, )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
