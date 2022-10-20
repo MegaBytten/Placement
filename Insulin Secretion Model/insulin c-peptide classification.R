@@ -549,3 +549,21 @@ plot(model_data$Model4Prob[model_data$AvgAnnualRUCPCR <0], model_data$AvgAnnualR
 
 
 
+type_2_group %>%
+  select(UCPCR, V2UCPCR, V3UCPCR) %>%
+  rename("Visit 1" = "UCPCR") %>%
+  rename("Visit 2" = "V2UCPCR") %>%
+  rename("Visit 3" = "V3UCPCR") %>%
+  gather() %>%
+  filter(value < 20) %>%
+  # mutate(key = as.numeric(key)) %>%
+  ggplot2::ggplot() +
+  geom_violin(aes(x = key, y = value)) +
+  #geom_boxplot(aes(x = key, y = value)) +
+  xlab('Visits') +
+  ylab('UCPCR mol/mmol')
+#geom_point(aes(x = key, y = value)) +
+#geom_smooth(aes(x = key, y = value), method = 'lm')
+
+
+
