@@ -469,6 +469,7 @@ negative %>%
 ### - Therefore, investigate these indiviudals and see what treatment their GP
 ###   prescribed
 ###    > is a heavier weight/emphasis placed on antibodies clinically?
+###    > How do their GRS (only unbiased Type1/2 discriminating factor) compare?
 ################################################################################
 
 low_risk_antibody_positive = not_insulin %>%
@@ -476,7 +477,8 @@ low_risk_antibody_positive = not_insulin %>%
   filter(Model4Prob < 0.333) %>%
   select(BMI, GADA_Status, IA2A_Status, ZNT8_Status, AgeatDiagnosis,
          Initial_diabetes_Insulin, Type_of_diabetes, EthnicOrigin,
-         Insulin, V2Insulin, V3Insulin, Time_to_insulin, HbA1c_at_diagnosis)
+         Insulin, V2Insulin, V3Insulin, Time_to_insulin, HbA1c_at_diagnosis,
+         GRS)
 
 progressed = low_risk_antibody_positive %>%
   filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")
@@ -512,8 +514,11 @@ remained %>%
 # Graph ethnicities
 barplot( table(remained$EthnicOrigin) )
 
-
-
+################ Calculating mean GRS of those ON insulin ######################
+model_data %>%
+  filter(Initial_diabetes_Insulin == "Insulin") %>%
+  select(GRS) %>%
+  describe()
 
 
 ################################################################################
@@ -528,23 +533,90 @@ barplot( table(remained$EthnicOrigin) )
 ###    > Allows testing of thresholds, which probability should mean 'positive'
 ################################################################################
 
+
+########################### Model 4 ROC Curve ##################################
 #initialize new column as NA
 not_insulin$progressed = NA
 
-#Calculate new binary variable for non-insulin group
+#If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
 roc_data = not_insulin %>%
-  filter(!is.na(progressed)) %>%
-  mutate(progressed = ifelse(Model4Prob > 0.5, 1, 0))
+  mutate(progressed = ifelse(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes",
+                             1, 0))
+
+roc_data = roc_data %>%
+  filter(!is.na(progressed) & !is.na(Model4Prob))
 
 #Storing the logistic regression results
 glm.fit = glm(roc_data$progressed ~ roc_data$Model4Prob, family = binomial())
+plot.new()
 lines(roc_data$Model4Prob, glm.fit$fitted.values)
 
-roc(roc_data$progressed, glm.fit$fitted.values, plot=TRUE)
+roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
 
-roc_data %>%
-  select(Model4Prob, progressed) %>%
-  describe()
+
+########################### Model 1 ROC Curve ##################################
+#Storing the logistic regression results
+glm.fit = glm(roc_data$progressed ~ roc_data$Model1Prob, family = binomial())
+plot.new()
+lines(roc_data$Model1Prob, glm.fit$fitted.values)
+
+roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
+
+TODO:
+  need help troubleshooting this
+  Applying a binary numeric vector to a binary outcome?? does it work?
+########################### Antibodies ROC Curve ##################################
+# Create new variable if patients were antibody positive or not
+not_insulin$antibody_positive = NA
+
+#If patients WERE antibody+ then antibody_positive = 1, otherwise 0
+roc_data = not_insulin %>%
+  mutate(antibody_positive = ifelse(GADA_Status == "1" | IA2A_Status == "1",
+                             1, 0))
+#Filter NA values
+roc_data = roc_data %>%
+  filter(!is.na(progressed) & !is.na(antibody_positive))
+
+#Storing the logistic regression results
+glm.fit = glm(roc_data$progressed ~ roc_data$antibody_positive, family = binomial())
+plot.new()
+lines(roc_data$progressed, glm.fit$fitted.values)
+
+roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
+
+
+################################################################################
+############################### Calibration ####################################
+################################################################################
+### - Calibrating the model to see how accurate it is
+### - Break apart model probabilities into deciles
+### - Test what % of people from each decile went on to have a positive outcome
+###    > in this context what % of people went on to switch to insulin
+###    > this tests how accurate the model is, if model predicts 10% do 10% of 
+###     people switch within that decile?
+################################################################################
+
+deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+
+for (decile in deciles){
+  # Need to handle first and last number specially
+  if (decile == 0.1) {
+   not_insulin %>%
+      filter(Model4Prob <= decile & progressed == 1) %>%
+      nrow()
+  # Need to handle first and last number specially
+  } else if (decile == 1.0){
+   
+  # Index 2-9 = core loop
+  } else {
+    
+  }
+  
+  not_insulin %>%
+    filter(Model4Prob)
+}
+
+
 
 ################################ FUTURE ########################################
 
