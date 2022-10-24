@@ -539,11 +539,11 @@ model_data %>%
 not_insulin$progressed = NA
 
 #If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
-roc_data = not_insulin %>%
+not_insulin = not_insulin %>%
   mutate(progressed = ifelse(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes",
                              1, 0))
 
-roc_data = roc_data %>%
+roc_data = not_insulin %>%
   filter(!is.na(progressed) & !is.na(Model4Prob))
 
 #Storing the logistic regression results
@@ -597,24 +597,37 @@ roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
 ################################################################################
 
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+results = list()
 
-for (decile in deciles){
+for (x in 1:10){
   # Need to handle first and last number specially
-  if (decile == 0.1) {
-   not_insulin %>%
-      filter(Model4Prob <= decile & progressed == 1) %>%
+  if (x == 1) {
+    print('# Of patients progressed to Insulin within first Decile = ')
+    value = not_insulin %>%
+      filter(Model4Prob <= 0.1 & progressed == 1) %>%
       nrow()
+    results[1] = value
   # Need to handle first and last number specially
-  } else if (decile == 1.0){
-   
+  } else if (x == 10){
+    print('# Of patients progressed to Insulin within last Decile = ')
+    value = not_insulin %>%
+      filter(Model4Prob > 0.9 & progressed == 1) %>%
+      nrow()
+    results[10] = value
   # Index 2-9 = core loop
   } else {
-    
+    print(paste('# Of patients progressed to Insulin within Decile: ', x, ' = '))
+    value = not_insulin %>%
+      filter(Model4Prob > deciles[x-1] & Model4Prob <= deciles[x]) %>%
+      nrow()
+    results[x] = value
   }
-  
-  not_insulin %>%
-    filter(Model4Prob)
 }
+
+plot(deciles, results)
+
+
+
 
 
 
