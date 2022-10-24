@@ -596,6 +596,7 @@ roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
 ###     people switch within that decile?
 ################################################################################
 
+############# Clin Features + Antibody Model Calibration #######################
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 results = list()
 
@@ -603,36 +604,95 @@ for (x in 1:10){
   # Need to handle first and last number specially
   if (x == 1) {
     print('# Of patients progressed to Insulin within first Decile = ')
-    value = not_insulin %>%
+    total = not_insulin %>%
+      filter(Model4Prob <= 0.1) %>%
+      nrow()
+    
+    progressed = not_insulin %>%
       filter(Model4Prob <= 0.1 & progressed == 1) %>%
       nrow()
-    results[1] = value
+    results[1] = progressed/total
   # Need to handle first and last number specially
   } else if (x == 10){
     print('# Of patients progressed to Insulin within last Decile = ')
-    value = not_insulin %>%
+    total = not_insulin %>%
+      filter(Model4Prob > 0.9) %>%
+      nrow()
+    
+    progressed = not_insulin %>%
       filter(Model4Prob > 0.9 & progressed == 1) %>%
       nrow()
-    results[10] = value
+    results[10] = progressed / total
   # Index 2-9 = core loop
   } else {
     print(paste('# Of patients progressed to Insulin within Decile: ', x, ' = '))
-    value = not_insulin %>%
+    total = not_insulin %>%
       filter(Model4Prob > deciles[x-1] & Model4Prob <= deciles[x]) %>%
       nrow()
-    results[x] = value
+    
+    progressed = not_insulin %>%
+      filter(Model4Prob > deciles[x-1] & Model4Prob <= deciles[x] & progressed == 1) %>%
+      nrow()
+    
+    results[x] = progressed / total
   }
 }
 
-plot(deciles, results)
+plot(deciles, results,
+     main = 'Clinical Features + Antibody Model',
+     xlab = 'Model Probability',
+     ylab = '% progressed to insulin')
+
+
+######################## Clin Features  Calibration ############################
+for (x in 1:10){
+  # Need to handle first and last number specially
+  if (x == 1) {
+    print('# Of patients progressed to Insulin within first Decile = ')
+    total = not_insulin %>%
+      filter(Model1Prob <= 0.1) %>%
+      nrow()
+    
+    progressed = not_insulin %>%
+      filter(Model1Prob <= 0.1 & progressed == 1) %>%
+      nrow()
+    results[1] = progressed/total
+    # Need to handle first and last number specially
+  } else if (x == 10){
+    print('# Of patients progressed to Insulin within last Decile = ')
+    total = not_insulin %>%
+      filter(Model1Prob > 0.9) %>%
+      nrow()
+    
+    progressed = not_insulin %>%
+      filter(Model1Prob > 0.9 & progressed == 1) %>%
+      nrow()
+    results[10] = progressed / total
+    # Index 2-9 = core loop
+  } else {
+    print(paste('# Of patients progressed to Insulin within Decile: ', x, ' = '))
+    total = not_insulin %>%
+      filter(Model1Prob > deciles[x-1] & Model1Prob <= deciles[x]) %>%
+      nrow()
+    
+    progressed = not_insulin %>%
+      filter(Model1Prob > deciles[x-1] & Model1Prob <= deciles[x] & progressed == 1) %>%
+      nrow()
+    
+    results[x] = progressed / total
+  }
+}
+
+plot(deciles, results,
+     main = 'Clinical Features Model',
+     xlab = 'Model Probability',
+     ylab = '% progressed to insulin')
 
 
 
-
-
-
+################################################################################
 ################################ FUTURE ########################################
-
+################################################################################
 
 ################################################################################
 ####################### Investigating individuals ##############################
