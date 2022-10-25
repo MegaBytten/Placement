@@ -201,6 +201,12 @@ not_insulin %>%
   geom_smooth(aes(x = key, y = value), method = 'lm')
 
 ################################## MODEL 1 #####################################  
+#calculate how many patients progressed to insulin >0.5 prob
+not_insulin %>% 
+  filter(Model1Prob > 0.5) %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
 #descriptive stats for High Risk group
 high_risk = not_insulin %>%
   filter(Model1Prob >= 0.667) %>%
@@ -310,7 +316,13 @@ low_risk %>%
 
 
 
-################################## MODEL 2 #####################################  
+################################## MODEL 2 #####################################
+#calculate how many patients progressed to insulin >0.5 prob
+not_insulin %>% 
+  filter(Model4Prob > 0.5) %>%
+  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
+  nrow()
+
 #descriptive stats for High Risk group
 high_risk = not_insulin %>%
   filter(Model4Prob >= 0.667) %>%
@@ -639,6 +651,8 @@ for (x in 1:10){
 }
 
 plot(deciles, results,
+     xlim = c(0,1),
+     ylim = c(0,1),
      main = 'Clinical Features + Antibody Model',
      xlab = 'Model Probability',
      ylab = '% progressed to insulin')
@@ -684,6 +698,8 @@ for (x in 1:10){
 }
 
 plot(deciles, results,
+     xlim = c(0,1),
+     ylim = c(0,1),
      main = 'Clinical Features Model',
      xlab = 'Model Probability',
      ylab = '% progressed to insulin')
