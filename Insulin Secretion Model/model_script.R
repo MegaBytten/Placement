@@ -1285,20 +1285,38 @@ summary(lm(unlist(results) ~ unlist(deciles), data=roc_data))
 #Create new column
 not_insulin$duration_follow_up = NA
 
-#filter and calculate difference between dates
+#Binary variable if they have V3 data
+not_insulin$HaveV3Data = NA
 not_insulin = not_insulin %>%
-  filter(V3Date_Contacted != '' & !is.na(V3Date_Contacted)) %>%
+  mutate(HaveV3Data = ifelse(V3Date_Contacted != '' & !is.na(V3Date_Contacted), 1, 0))
+
+#Binary variable if they have V2 data
+not_insulin$HaveV2Data = NA
+not_insulin = not_insulin %>%
+  mutate(HaveV2Data = ifelse(V2Date_Contacted != '' & !is.na(V2Date_Contacted), 1, 0))
+
+#Calculating difference between dates for patients who have V3
+V3_patients = not_insulin %>%
+  filter(HaveV3Data == 1) %>%
   filter(DateofDiagnosis != '' & !is.na(DateofDiagnosis)) %>%
   mutate(duration_follow_up = difftime(
     as.Date(V3Date_Contacted, "%m/%d/%Y"),
     as.Date(DateofDiagnosis, "%d-%B-%y"), 
     units = 'weeks'), NA)
 
-hist(as.numeric(not_insulin$duration_follow_up))
+#Calculating difference between dates for patients who dont have V3 data
+V2_patients = not_insulin %>%
+  filter(HaveV3Data == 0 & HaveV2Data == 1) %>%
+  filter(DateofDiagnosis != '' & !is.na(DateofDiagnosis)) %>%
+  mutate(duration_follow_up = difftime(
+    as.Date(V2Date_Contacted, "%d-%b-%y"),
+    as.Date(DateofDiagnosis, "%d-%B-%y"), 
+    units = 'weeks'), NA)
 
-not_insulin %>%
-  select(duration_follow_up) %>%
+updated_not_insulin = rbind.data.frame(V3_patients, V2_patients)
+updated_not_insulin %>%
   mutate(duration_follow_up = as.numeric(duration_follow_up)) %>%
+  select(duration_follow_up) %>%
   describe()
 
 ################################################################################
