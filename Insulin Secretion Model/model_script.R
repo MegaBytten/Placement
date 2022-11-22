@@ -16,17 +16,11 @@ library(val.prob) # Out dated for this version of R
 filepath = '~/Downloads/Insulin secretion model/startight Aug 22 comma separated.csv'
 my_data <- import(filepath)
 View(my_data)
-
-
-
-
-
 ################################################################################
-########### Section for Cleaning and preparing Data: ###########################
+################ Section for Cleaning and preparing Data: ######################
 ################################################################################
 ### - no current clean GAD, ZNT8 code
 ### - This section creates new columns to be used in the models
-################################################################################
 ################################################################################
 #Islet autoantibodies were considered positive if: 
 #GADA ≥11 units/mL, IA2A ≥7.5 units/mL and ZNT8A ≥65 units/mL in those aged up to 30 years 
@@ -47,10 +41,25 @@ my_data$IA2A_Status = NA
 my_data$IA2A_Status[my_data$IA2 == 'negative'] = 0
 my_data$IA2A_Status[grepl("[0-9]",my_data$IA2) & as.numeric(my_data$IA2) >= 7.5] = 1
 
+#Fixing BMI
+my_data = my_data %>%
+  mutate(BMI = ifelse(is.na(BMI), Weight / (Height^2), BMI))
+################################################################################
+####################### Correcting GRS Scores ##################################
+################################################################################
+### - Current GRS scores in startright are case, not controlled
+### - Need to fit GRS scores for individuals against a type-1 dataset to see
+###   which centile our individuals would score
+################################################################################
+my_data = my_data %>%
+  mutate(Number_Antibodies = as.numeric(GADA_Status + IA2A_Status + ZNT8_Status))
 
+type_1_control_cohort = my_data %>%
+  filter(Insulin == "Yes" & Number_Antibodies >= 2 & Type_of_diabetes == "Type 1") %>%
+  filter(SCORE != '' & !is.na(SCORE)) # n = 456
 
-
-
+# Calculating calibrated GRS centiles using z-score pnorm() ####
+my_data$Calibrated_GRS_Centiles = pnorm(my_data$SCORE, mean = mean(type_1_control_cohort$SCORE), sd = sd(type_1_control_cohort$SCORE))
 ################################################################################
 #################### Section for testing Model 1: ##############################
 ################################################################################
@@ -60,22 +69,11 @@ my_data$IA2A_Status[grepl("[0-9]",my_data$IA2) & as.numeric(my_data$IA2) >= 7.5]
 ### = 37.94 + (-5.09 * log(age at diagnosis)) + (-6.34 * log(BMI))
 ################################################################################
 ################################################################################
-
-#Create new dataframe for use that includes BMI data
+# Creating new data frame: model_data for use in models! ####
 model_data = my_data %>%
   filter( (!is.na(my_data$Height) & !is.na(my_data$Weight)) | !is.na(my_data$BMI) )
-
-#Fill in any missing values for BMI
-model_data = model_data %>%
-  mutate(BMI = ifelse(is.na(BMI), Weight / (Height^2), BMI))
-
 #Add new column containing model prediction score
 model_data$Model1LogOR = 37.94 + (-5.09 * log(model_data$AgeatDiagnosis)) + (-6.34 * log(model_data$BMI))
-
-
-
-
-
 ################################################################################
 #################### Section for testing Model 2: ##############################
 ################################################################################
@@ -85,17 +83,11 @@ model_data$Model1LogOR = 37.94 + (-5.09 * log(model_data$AgeatDiagnosis)) + (-6.
 ### = 34.8057844720 + (-4.801441792 * log (Age at diagnosis)) + (-5.980577792 * log(BMI)) + (2.937107976 * GADA)
 ################################################################################
 ################################################################################
-
 #Exclude anyone without GAD data
 model_data$Model2LogOR[is.na(model_data$GADA_Status)] = NA
 
 #Add new column containing model prediction score
 model_data$Model2LogOR[!is.na(model_data$GADA_Status)] = 34.8057844720 + (-4.801441792 * log (model_data$AgeatDiagnosis[!is.na(model_data$GADA_Status)])) + (-5.980577792 * log(model_data$BMI[!is.na(model_data$GADA_Status)])) + (2.937107976 * model_data$GADA_Status[!is.na(model_data$GADA_Status)])
-
-
-
-
-
 ################################################################################
 #################### Section for testing Model 3: ##############################
 ################################################################################
@@ -105,17 +97,12 @@ model_data$Model2LogOR[!is.na(model_data$GADA_Status)] = 34.8057844720 + (-4.801
 ### = 37.26905033 + (3.194096 * IA2† ) + (-5.047657308 * Log(Age)) + (-6.287258808 * Log(BMI))
 ################################################################################
 ################################################################################
-
 #Exclude anyone without IA2 data
 model_data$Model3LogOR[is.na(model_data$IA2A_Status)] = NA
 
 #Add new column containing model prediction score
 model_data$Model3LogOR[!is.na(model_data$IA2A_Status)] = 37.26905033 + (3.194096 * model_data$IA2A_Status[!is.na(model_data$IA2A_Status)]) + (-5.047657308 * log(model_data$AgeatDiagnosis[!is.na(model_data$IA2A_Status)])) + (-6.287258808 * log(model_data$BMI[!is.na(model_data$IA2A_Status)]))
-
-
-
-
-
+################################################################################
 ################################################################################
 #################### Section for testing Model 4: ##############################
 ################################################################################
@@ -136,27 +123,30 @@ model_data$Both_Status[model_data$IA2A_Status == 1 & model_data$GADA_Status == 1
 
 #Add new column containing model prediction score
 model_data$Model4LogOR[!is.na(model_data$Both_Status)] = 33.49649577 + (-4.665598345 * log(model_data$AgeatDiagnosis[!is.na(model_data$Both_Status)])) + (-5.81137397 * log(model_data$BMI[!is.na(model_data$Both_Status)])) + (3.082366 * model_data$GADA_Status[!is.na(model_data$Both_Status)]) + (3.494462 * model_data$IA2A_Status[!is.na(model_data$Both_Status)]) + (4.350717 * model_data$Both_Status[!is.na(model_data$Both_Status)])
-
-
 ################################################################################
 #################### Section for testing Model 5: ##############################
 ################################################################################
-### - Clinical features + GRS Model
-### - Takes in AgeatDiag, BMI, and GRS
+### - Clinical features + Autoantibodies + GRS Model
 ### - Selection and model based around following equation
-### = 24.46138054 + (-4.443506884 * Log(Age)) + (-5.534741384 * Log(BMI)) + (33.93968 * GRS)
+### = 21.57649882 + (-4.086215772 * log(Age)) + (-5.096252172 * log(BMI)) + (2.702010666 * [GAD POSITIVE ONLY 1 OR 0]) + (3.063255174 * [IA2 POSITIVE ONLY 1 OR 0]) + (3.813850704 * [BOTH GAD AND IA2 POSITIVE 1 OR 0]) + (30.11052 * GRS)
 ################################################################################
-################################################################################
-#Exclude anyone without ZNT8 data OR without GADA data
-model_data$Model5LogOR = NA
-
-#Calculate model's LOG OR
+#Need to establish if patients are GAD positive only, IA2 positive only, or both positive
+model_data$AntiStatus1 = NA #GAD positive only
 model_data = model_data %>%
-  mutate(Model5LogOR = 24.46138054 + (-4.443506884 * log(AgeatDiagnosis)) + (-5.534741384 * log(BMI)) + (33.93968 * GRS), NA)
+  mutate(AntiStatus1 = ifelse(GADA_Status == 1 & IA2A_Status == 0, 1, 0))
 
-hist(model_data$Model5LogOR)
+model_data$AntiStatus2 = NA #IA2 positive only
+model_data = model_data %>%
+  mutate(AntiStatus2 = ifelse(GADA_Status == 0 & IA2A_Status == 1, 1, 0))
 
+model_data$AntiStatus3 = NA #Both positive
+model_data = model_data %>%
+  mutate(AntiStatus3 = ifelse(GADA_Status == 1 & IA2A_Status == 1, 1, 0))
 
+#Calculate LogOddsRatio
+model_data$Model5LogOR = NA
+model_data = model_data %>%
+  mutate(Model5LogOR = 21.57649882 + (-4.086215772 * log(AgeatDiagnosis)) + (-5.096252172 * log(BMI)) + (2.702010666 * AntiStatus1) + (3.063255174 * AntiStatus2) + (3.813850704 * AntiStatus3) + (30.11052 * Calibrated_GRS_Centiles/100), NA)
 ################################################################################
 ############## Converting LogOR into Probability (risk) ########################
 ################################################################################
@@ -168,8 +158,7 @@ model_data$Model2Prob[!is.na(model_data$Model2LogOR)] = exp(model_data$Model2Log
 model_data$Model3Prob[!is.na(model_data$Model3LogOR)] = exp(model_data$Model3LogOR[!is.na(model_data$Model3LogOR)]) / (1 + exp(model_data$Model3LogOR[!is.na(model_data$Model3LogOR)]) )
 model_data$Model4Prob[!is.na(model_data$Model4LogOR)] = exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) / (1 + exp(model_data$Model4LogOR[!is.na(model_data$Model4LogOR)]) )
 
-#Calculate model's probability
-model_data$Model5Prob = NA
+#Calculate model's probability: GRS MODEL
 model_data = model_data %>%
   mutate(Model5Prob = ifelse(!is.na(Model5LogOR), exp(Model5LogOR) / (1 + exp(Model5LogOR)), NA))
 ################################################################################
@@ -179,17 +168,16 @@ model_data = model_data %>%
 model_data$Time_to_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''] = difftime(as.Date(model_data$Date_continuous_insulin[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y"), as.Date(model_data$DateofDiagnosis[model_data$Date_continuous_insulin != '' & model_data$DateofDiagnosis != ''], "%d-%B-%Y") , units = 'weeks')
 model_data$Time_to_insulin[model_data$Time_to_insulin < 0] = 0
 ################################################################################
-################### Descriptive Stats on Not Insulin ##########################
+################### Descriptive Stats on Not Insulin ###########################
 ################################################################################
 ### - Segregated into 3 groups: progressed, didnt progress and total
 ### - Age at Diag, BMI, HbA1c at Diag, 
 ################################################################################
-
-#creating new dataframe for use 
+# Assigning/Creating new not_insulin dataframe ####
 not_insulin = model_data %>%
-  filter(Initial_diabetes_Insulin != "Insulin")
-
-#################### Total Non-insulin group ###################################
+  filter(Initial_diabetes_Insulin != "Insulin") %>%
+  filter(!is.na(Model1Prob) & !is.na(Model2Prob) & !is.na(Model3Prob) & !is.na(Model4Prob) & !is.na(Model5Prob) & !is.na(Calibrated_GRS_Centiles) )
+# Total Non-insulin group ###################################
 # n =
 nrow(not_insulin)
 
@@ -216,7 +204,7 @@ not_insulin %>%
   filter(GADA_Status == 0 & IA2A_Status == 0) %>%
   nrow()
 
-################## Progressed Non-insulin group ################################
+# Progressed Non-insulin group ################################
 # n =
 not_insulin %>%
   filter(Insulin == 'Yes' | V2Insulin == 'Yes' | V3Insulin == 'Yes') %>%
@@ -250,7 +238,7 @@ not_insulin %>%
   filter(GADA_Status == 0 & IA2A_Status == 0) %>%
   nrow()
 
-################## NO-progress Non-insulin group ###############################
+# NO-progress Non-insulin group ###############################
 # n =
 not_insulin %>%
   filter(V3Insulin == 'No') %>%
@@ -288,19 +276,18 @@ not_insulin %>%
 
 
 ################################################################################
-################### Graphing 2 models against eachother ########################
+################ Graphing Violion models against eachother #####################
 ################################################################################
 ### - Clin features model
 ### - Clin features + autoantibodies (GAD IA2)
 ### - compared using gg VIOLIN Plot
 ################################################################################
-############################### visualization ##################################
 not_insulin %>%
   filter(!is.na(Model4Prob) & !is.na(Model1Prob) & !is.na(Model5Prob)) %>%
   select(Model1Prob, Model4Prob, Model5Prob) %>%
   rename("Clin Features Model" = "Model1Prob") %>%
   rename("Clin + Antibody Model" = "Model4Prob") %>%
-  rename("Clin + GRS Model" = "Model5Prob") %>%
+  rename("Clin + Anti + GRS Model" = "Model5Prob") %>%
   gather() %>%
   ggplot2::ggplot() +
   geom_violin(aes(x = key, y = value)) +
@@ -314,7 +301,7 @@ not_insulin %>%
 ### - Clin features + autoantibodies (GAD IA2)
 ### - compared to using GAD and IA2
 ################################################################################
-################################## MODEL 1 #####################################  
+# MODEL 1 #####################################  
 #calculate how many patients progressed to insulin >0.5 prob
 not_insulin %>% 
   filter(Model1Prob > 0.5) %>%
@@ -430,7 +417,7 @@ low_risk %>%
 
 
 
-################################## MODEL 2 #####################################
+# MODEL 2 #####################################
 #calculate how many patients progressed to insulin >0.5 prob
 not_insulin %>% 
   filter(Model4Prob > 0.5) %>%
@@ -539,7 +526,7 @@ low_risk %>%
   nrow()
 
 
-################################## MODEL 3 #####################################  
+# Antibodies #####################################  
 #AUTO ANTIBODIES
 #descriptive stats for High Risk group
 positive = not_insulin %>%
@@ -579,13 +566,6 @@ describe(as.numeric(negative$Time_to_insulin))
 negative %>%
   filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
   nrow()
-
-
-
-
-
-
-
 ################################################################################
 ################# Non-insulin low-risk antibody+ patients ######################
 ################################################################################
@@ -615,7 +595,7 @@ remained = low_risk_antibody_positive %>%
   filter(Insulin != "Yes" & V2Insulin != "Yes" & V3Insulin != "Yes")
          
 
-########## Running descriptive stats on Patients who PROGRESSED ################
+# Running descriptive stats on Patients who PROGRESSED ################
 # % of GAD, IA2, ZNT8 positive AND mean BMI AND mean AgeatDiag AND mean Time_to_insulin
 progressed %>%
   describe()
@@ -629,7 +609,7 @@ progressed %>%
 barplot( table(progressed$EthnicOrigin) )
 
 
-######## Running descriptive stats on Patients who DIDNT progress ##############
+# Running descriptive stats on Patients who DIDNT progress ##############
 # % of GAD, IA2, ZNT8 positive AND mean BMI AND mean AgeatDiag AND mean Time_to_insulin
 remained %>%
   describe()
@@ -642,7 +622,7 @@ remained %>%
 # Graph ethnicities
 barplot( table(remained$EthnicOrigin) )
 
-################ Calculating mean GRS of those ON insulin ######################
+# Calculating mean GRS of those ON insulin ######################
 model_data %>%
   filter(Initial_diabetes_Insulin == "Insulin") %>%
   select(GRS) %>%
@@ -658,10 +638,7 @@ model_data %>%
 ###    > if modelProb > 0.6 = positive, else negative
 ###    > Allows testing of thresholds, which probability should mean 'positive'
 ################################################################################
-################################## ROC Init ####################################
-#initialize new column as NA
-not_insulin$progressed = NA
-
+# ROC Init ####################################
 #If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
 not_insulin = not_insulin %>%
   mutate(progressed = ifelse(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes",
@@ -670,7 +647,7 @@ not_insulin = not_insulin %>%
 roc_data = not_insulin %>%
   filter(!is.na(progressed) & !is.na(Model4Prob))
 
-########################### Model 4 ROC Curve ##################################
+# Model 4 ROC Curve ##################################
 #Storing the logistic regression results
 glm.fit = glm(roc_data$progressed ~ roc_data$Model4Prob, family = binomial())
 plot.new()
@@ -682,7 +659,7 @@ lines(roc_data$Model4Prob, glm.fit$fitted.values)
 coords(roc, x='best')
 
 
-########################### Model 1 ROC Curve ##################################
+# Model 1 ROC Curve ##################################
 #Storing the logistic regression results
 glm.fit = glm(roc_data$progressed ~ roc_data$Model1Prob, family = binomial())
 plot.new()
@@ -693,7 +670,7 @@ lines(roc_data$Model1Prob, glm.fit$fitted.values)
 #Getting threshold, sensitivity and specificity
 coords(roc, x='best')
 
-########################### Model 5 ROC Curve ##################################
+# Model 5 ROC Curve ##################################
 #Storing the logistic regression results
 roc_data = not_insulin %>%
   filter(!is.na(progressed) & !is.na(Model5Prob))
@@ -702,38 +679,35 @@ glm.fit = glm(roc_data$progressed ~ roc_data$Model5Prob, family = binomial())
 plot.new()
 lines(roc_data$Model5Prob, glm.fit$fitted.values)
 
-(roc = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE))
+(roc1 = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE))
 
 #Getting threshold, sensitivity and specificity
-coords(roc, x='best')
+coords(roc1, x='best')
+# P value for Mode 4 ROC vs Model 5 ROC ####
+roc.test(roc, roc1)
 
-########################### Antibodies ROC Curve ##################################
-# Create new variable if patients were antibody positive or not
-not_insulin$antibody_positive = NA
 
-#If patients WERE antibody+ then antibody_positive = 1, otherwise 0
+# Num Antibodies ROC Curve ####
+#If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
+not_insulin = not_insulin %>%
+  mutate(Number_Antibodies = as.numeric(GADA_Status + IA2A_Status + ZNT8_Status))
+
+
 roc_data = not_insulin %>%
-  mutate(antibody_positive = ifelse(GADA_Status == "1" | IA2A_Status == "1",
-                             1, 0))
-#Filter NA values
-roc_data = roc_data %>%
-  filter(!is.na(progressed) & !is.na(antibody_positive))
-
+  filter(!is.na(progressed) & !is.na(Number_Antibodies))
 
 #Storing the logistic regression results
-glm.fit = glm(roc_data$progressed ~ roc_data$antibody_positive, family = binomial())
+glm.fit = glm(roc_data$progressed ~ roc_data$Number_Antibodies, family = binomial())
 plot.new()
-lines(roc_data$progressed, glm.fit$fitted.values)
+lines(roc_data$Model4Prob, glm.fit$fitted.values)
 
-roc = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE)
+(roc1 = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE))
 
 #Getting threshold, sensitivity and specificity
-coords(roc, x='best')
+coords(roc1, x='best')
 
-
-
-
-
+# P value for Model 4 vs Number of Antibodies ####
+roc.test(roc, roc1)
 ################################################################################
 ############################### Calibration ####################################
 ################################################################################
@@ -744,7 +718,7 @@ coords(roc, x='best')
 ###    > this tests how accurate the model is, if model predicts 10% do 10% of 
 ###     people switch within that decile?
 ################################################################################
-############# Clin Features + Antibody Model Calibration #######################
+# Clin Features + Antibody Model Calibration #######################
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 results = list()
 
@@ -804,7 +778,7 @@ lines(unlist(deciles),
 #calculate correlation coefficient
 cor(unlist(results), unlist(deciles))
 
-######################## Clin FeaturesCalibration ############################
+# Clin Features Calibration ############################
 for (x in 1:10){
   # Need to handle first and last number specially
   if (x == 1) {
@@ -861,7 +835,7 @@ cor(unlist(results), unlist(deciles), method = "pearson")
 
 
 
-######################### Clin F + GRS Calibration #############################
+# Clin F + Anti + GRS Calibration #########################
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 results = list()
 for (x in 1:10){
@@ -905,7 +879,7 @@ for (x in 1:10){
 plot(deciles, results,
      xlim = c(0,1),
      ylim = c(0,1),
-     main = 'Clinical F + GRS Model',
+     main = 'Clinical F + Anti + GRS Model',
      xlab = 'Model Probability',
      ylab = '% progressed to insulin')
 
@@ -918,118 +892,10 @@ lines(unlist(deciles),
       col = 2,
       lwd = 2)
 (paste("y =", coef(calibration_plot)[[1]], "+", coef(calibration_plot)[[2]], "* x"))
-################################################################################
-###################### Sensitivity and Specificity #############################
-################################################################################
-### - Calculate sensitivity and specificity for 2 models and antibodies
-### - Outcomes are based on a model threshold of 0.5
-### - Sensitivity = True Positive / True positive + False negative
-### - Specificity = True Negative / True negative + False Positive
-################################################################################
-######################## Clin F Model Sens #####################################
-#true positive = >0.5 Model that progressed
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-#false negative = <0.5 model that progressed
-
-# number of true positives 
-not_insulin %>%
-  filter(Model1Prob > 0.5 & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-# number of false negatives
-not_insulin %>%
-  filter(Model1Prob < 0.5 & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-######################## Clin F Model Spec #####################################
-### - Specificity = True Negative / True negative + False Positive
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-
-
-# number of true negatives 
-not_insulin %>%
-  filter(Model1Prob < 0.5 & V3Insulin == "No") %>%
-  nrow()
-
-# number of false positives
-not_insulin %>%
-  filter(Model1Prob > 0.5 & V3Insulin == "No") %>%
-  nrow()
-
-
-###################### Antibody Model Sens #####################################
-#true positive = >0.5 Model that progressed
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-#false negative = <0.5 model that progressed
-
-# number of true positives 
-not_insulin %>%
-  filter(Model4Prob > 0.5 & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-# number of false negatives
-not_insulin %>%
-  filter(Model4Prob < 0.5 & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-######################## Antibody Model Spec ###################################
-### - Specificity = True Negative / True negative + False Positive
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-
-
-# number of true negatives 
-not_insulin %>%
-  filter(Model4Prob < 0.5 & V3Insulin == "No") %>%
-  nrow()
-
-# number of false positives
-not_insulin %>%
-  filter(Model4Prob > 0.5 & V3Insulin == "No") %>%
-  nrow()
-
-
-####################### AutoAntibodies Sens ####################################
-#true positive = >0.5 Model that progressed
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-#false negative = <0.5 model that progressed
-
-# number of true positives 
-not_insulin %>%
-  filter( (GADA_Status == 1 | IA2A_Status == 1) & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-# number of false negatives
-not_insulin %>%
-  filter( (GADA_Status == 0 | IA2A_Status == 0) & ( Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes")) %>%
-  nrow()
-
-######################## AutoAntibodies Spec ###################################
-### - Specificity = True Negative / True negative + False Positive
-#true negative = <0.5 model that didnt progress
-#false positive = >0.5 model that didnt progress
-
-
-# number of true negatives 
-not_insulin %>%
-  filter( (GADA_Status == 0 | IA2A_Status == 0) & V3Insulin == "No") %>%
-  nrow()
-
-# number of false positives
-not_insulin %>%
-  filter( (GADA_Status == 1 | IA2A_Status == 1) & V3Insulin == "No") %>%
-  nrow()
-
-
-
-
 
 ################################################################################
-############# Using Clin Model as Antibody Qualification #######################
+################# Sub Investigation: Clin Features Model #######################
+################ Able to Detect Antibody Positive Patients #####################
 ################################################################################
 ### - Clinical Model distinguishes pretty well for those who would be 
 ###   antibody positive
@@ -1042,11 +908,7 @@ not_insulin %>%
 ###    > AUC ROC curve for Clinical Features model and outcome is antibody +
 ###    > Calibration plot for the same
 ################################################################################
-################### AUC ROC Curve for Antibody #################################
-
-#New column for outcome
-not_insulin$antibody_positive = NA
-
+# AUC ROC Curve for Antibody #################################
 #Estabishing outcome = if ANY 3 antibody+ is positive outcome
 not_insulin = not_insulin %>%
   mutate(antibody_positive = ifelse(GADA_Status == 1 | IA2A_Status == 1 | ZNT8_Status == 1, 1, 0))
@@ -1081,7 +943,7 @@ coords(roc, x='best')
 
 
 
-######################## Clin Features Calibration #############################
+# Clin Features Calibration #############################
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 results = list()
 
@@ -1145,42 +1007,7 @@ lines(unlist(deciles),
 
 
 ################################################################################
-########################## Antibodies ROC ######################################
-################################################################################
-### - Need to see how models compared to antibodies
-### - Using how any antibodies patients had to compare models to
-###- Generate a ROC based on that
-################################################################################
-#initialize new column as NA
-not_insulin$progressed = NA
-
-#If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
-not_insulin = not_insulin %>%
-  mutate(progressed = ifelse(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes",
-                             1, 0))
-
-#initialize new column as NA
-not_insulin$Number_Antibodies = NA
-
-#If patients WERE  on insulin by V1, V2 or V3 then progressed = 1, otherwise 0
-not_insulin = not_insulin %>%
-  mutate(Number_Antibodies = as.numeric(GADA_Status + IA2A_Status + ZNT8_Status))
-
-
-roc_data = not_insulin %>%
-  filter(!is.na(progressed) & !is.na(Number_Antibodies))
-
-#Storing the logistic regression results
-glm.fit = glm(roc_data$progressed ~ roc_data$Number_Antibodies, family = binomial())
-plot.new()
-lines(roc_data$Model4Prob, glm.fit$fitted.values)
-
-(roc = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE))
-
-#Getting threshold, sensitivity and specificity
-coords(roc, x='best')
-################################################################################
-####################### Model 4 in Antibody+ ###################################
+##################### Model 4 and 5 in Antibody+ ###############################
 ################################################################################
 ### - If those are already antibody positive, is there any use in model?
 ### - Run model in those antibody positive and see result
@@ -1189,7 +1016,7 @@ coords(roc, x='best')
 roc_data = not_insulin %>%
   filter(Number_Antibodies > 0)
 
-##################### Descriptive Stats ########################################
+#Descriptive Stats ########################################
 nrow(roc_data)
 
 #look at those who did progress
@@ -1202,9 +1029,9 @@ roc_data %>%
   filter(progressed == 0) %>%
   nrow()
 
-################################## ROC #########################################
-roc_data = roc_data %>%
-  filter(!is.na(progressed) & !is.na(Model4Prob))
+#ROC #########################################
+roc_data = not_insulin %>%
+  filter(!is.na(progressed) & !is.na(Model4Prob) & Number_Antibodies >= 1)
 
 #Storing the logistic regression results
 glm.fit = glm(roc_data$progressed ~ roc_data$Model4Prob, family = binomial())
@@ -1217,7 +1044,24 @@ lines(roc_data$Model4Prob, glm.fit$fitted.values)
 #Getting threshold, sensitivity and specificity
 coords(roc, x='best')
 
-############################### Calibration ####################################
+# Model 5 in Antibody Positive! ROC Curve ##################################
+#Storing the logistic regression results
+roc_data = not_insulin %>%
+  filter(!is.na(progressed) & !is.na(Model5Prob) & Number_Antibodies >= 1)
+
+glm.fit = glm(roc_data$progressed ~ roc_data$Model5Prob, family = binomial())
+plot.new()
+lines(roc_data$Model5Prob, glm.fit$fitted.values)
+
+(roc1 = roc(roc_data$progressed, glm.fit$fitted.values, auc=TRUE, plot=TRUE))
+
+#Getting threshold, sensitivity and specificity
+coords(roc, x='best')
+
+#COmpare two ROCS for p-value
+roc.test(roc, roc1)
+
+#Calibration ####################################
 deciles = list(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
 results = list()
 
@@ -1277,10 +1121,24 @@ lines(unlist(deciles),
 #For r-squared value
 summary(lm(unlist(results) ~ unlist(deciles), data=roc_data))
 
+#Descriptive Stats for Calibration ############################
+nrow(roc_data)
+
+#How many progressed
+roc_data %>%
+  filter(progressed == 1) %>%
+  nrow()
+
+#How many were over threshold
+roc_data %>%
+  filter(Model4Prob >= 0.1159171 & progressed == 1) %>%
+  nrow()
+
 ################################################################################
 ################## Finding Mean duration of follow up ##########################
 ################################################################################
 ### - How long was the average time from diagnosis to final follow up?
+### - A LOT of date formatting :(
 ################################################################################
 #Create new column
 not_insulin$duration_follow_up = NA
@@ -1319,49 +1177,13 @@ updated_not_insulin %>%
   select(duration_follow_up) %>%
   describe()
 
-################################################################################
-################################ FUTURE ########################################
-################################################################################
-
-
-
-################################################################################
-####################### Investigating individuals ##############################
-################################################################################
-### - Looking at individual-level data for those who switched to insulin
-################################################################################
-
-#See how many people in dataset are on insulin
-not_insulin %>%
-  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  select(StartRightID)
-
-switched_list = list('SR3071', 'SR3083', 'SR3152', 'SR3156', 'SR3157') #based on previous filtering and selection
-
-individual = not_insulin %>%
-  filter(Insulin == "Yes" | V2Insulin == "Yes" | V3Insulin == "Yes") %>%
-  filter(StartRightID == switched_list[5]) %>%
-  select(BMI, AgeatDiagnosis, Time_to_insulin, HbA1c_at_diagnosis, GADA_Status,
-         IA2A_Status, Model1Prob, Model4Prob, Type_of_diabetes)
-
-describe(individual)
-describe(as.numeric(individual$Time_to_insulin))
 
 
 
 
+###############Temp workspace ##################################################
+hist(not_insulin$Model5Prob)
+nrow(not_insulin)
 
 
-################################################################################
-############################# Util Functions ###################################
-################################################################################
-
-#Reset plot
-dev.off(dev.list()["RStudioGD"]) #Clears any previous dev plotting settings
-par(mfrow = c(4,1)) #Allows us to visualise 4 plots at once
-
-my_data$SCORE #NEW GRS SCORE
-not_insulin$Model4Prob
-
-bnfit <- 
-glm()
+     
